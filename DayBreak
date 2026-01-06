@@ -1,0 +1,41 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Lunar Speed",
+    LoadingTitle = "Carregando...",
+    LoadingSubtitle = "by Lunar",
+})
+
+local Tab = Window:CreateTab("Velocidade")
+
+local sprintSpeed = 18
+local normalSpeed = 16
+
+local Slider = Tab:CreateSlider({
+    Name = "Velocidade de Sprint",
+    Range = {18, 25},
+    Increment = 1,
+    CurrentValue = 18,
+    Callback = function(Value)
+        sprintSpeed = Value
+    end,
+})
+
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+game.Players.LocalPlayer.CharacterAdded:Connect(function(char)
+    char:WaitForChild("Humanoid")
+    normalSpeed = char.Humanoid.WalkSpeed
+end)
+
+RunService.RenderStepped:Connect(function()
+    local char = game.Players.LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
+            char.Humanoid.WalkSpeed = sprintSpeed
+        else
+            char.Humanoid.WalkSpeed = normalSpeed
+        end
+    end
+end)
