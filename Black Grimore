@@ -1,0 +1,93 @@
+-- SERVICES
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local LocalPlayer = Players.LocalPlayer
+
+-- ADMIN CHECK
+local ADMINS = {
+    [LocalPlayer.UserId] = true
+}
+
+if not ADMINS[LocalPlayer.UserId] then
+    warn("Você não é admin.")
+    return
+end
+
+-- RAYFIELD
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Black Clover | Auto Quest",
+    LoadingTitle = "Auto Quest",
+    LoadingSubtitle = "Yuno → Asta",
+    ConfigurationSaving = {
+        Enabled = false
+    }
+})
+
+local Tab = Window:CreateTab("Quest")
+
+-- VARS
+local farming = false
+local char, hrp
+
+local function refreshChar()
+    char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    hrp = char:WaitForChild("HumanoidRootPart")
+end
+
+refreshChar()
+LocalPlayer.CharacterAdded:Connect(refreshChar)
+
+-- FUNÇÕES
+local function pressG()
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
+end
+
+local function teleportTo(npc)
+    if npc and npc:FindFirstChild("HumanoidRootPart") then
+        hrp.CFrame = npc.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2)
+    end
+end
+
+-- TOGGLE
+Tab:CreateToggle({
+    Name = "Auto Quest Yuno → Asta",
+    CurrentValue = false,
+    Callback = function(Value)
+        farming = Value
+
+        task.spawn(function()
+            while farming do
+                refreshChar()
+
+                -- ===== YUNO =====
+                local Yuno = workspace.NPCs:FindFirstChild("Yuno")
+                if Yuno then
+                    teleportTo(Yuno)
+                    task.wait(0.5)
+
+                    -- Interagir 3x
+                    for i = 1, 3 do
+                        pressG()
+                        task.wait(0.2)
+                    end
+                end
+
+                -- Tempo pra aceitar a quest (manual/autoclicker)
+                task.wait(1.5)
+
+                -- ===== ASTA =====
+                local Asta = workspace.NPCs:FindFirstChild("Asta")
+                if Asta then
+                    teleportTo(Asta)
+                end
+
+                -- Tempo pra entregar a missão
+                task.wait(2)
+            end
+        end)
+    end
+})
