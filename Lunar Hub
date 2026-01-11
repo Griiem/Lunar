@@ -1,0 +1,134 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- [[ SETUP DO TEMA CUSTOM ]] --
+local ThemeTable = loadstring(game:HttpGet("https://raw.githubusercontent.com/Griiem/Lunar/refs/heads/main/Lunar%20Theme"))()
+Rayfield.Theme.LunarPro = ThemeTable
+
+-- [[ LIMPEZA DE AMBIENTE (KILL SWITCH) ]] --
+if getgenv().VFX_JumpConn then getgenv().VFX_JumpConn:Disconnect() end
+if getgenv().VFX_CharConn then getgenv().VFX_CharConn:Disconnect() end
+if getgenv().VFX_Cleaner then getgenv().VFX_Cleaner:Disconnect() end
+
+-- [[ CONFIGURAÇÕES GLOBAIS ]] --
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local Debris = game:GetService("Debris")
+local player = Players.LocalPlayer
+
+getgenv().SelectedVFX = "None"
+getgenv().GlobalVolume = 0.5
+
+local EffectsConfig = {
+    ["None"]          = {Delay = 0, Pos = 0, Life = 0},
+    ["Atomic"]        = {Delay = 0.13, Pos = -1.2, Life = 0.8},
+    ["Default"]       = {Delay = 0.13, Pos = -1.2, Life = 0.8},
+    ["Earth"]         = {Delay = 0.13, Pos = -1.2, Life = 1.0},
+    ["Fire"]          = {Delay = 0.13, Pos = -1.2, Life = 1.0},
+    ["HighFlyer"]     = {Delay = 0.13, Pos = -1.2, Life = 1.0},
+    ["Ice"]           = {Delay = 0.13, Pos = -1.2, Life = 0.8},
+    ["Light"]         = {Delay = 0.13, Pos = -1.2, Life = 0.8},
+    ["Lightning"]     = {Delay = 0.13, Pos = -1.2, Life = 1.0},
+    ["NewYears"]      = {Delay = 0.13, Pos = -1.2, Life = 0.8},
+    ["Nuclear"]       = {Delay = 0.13, Pos = -1.2, Life = 0.8},
+    ["Purple"]        = {Delay = 0.13, Pos = -1.2, Life = 0.8},
+    ["SUMMER2025"]    = {Delay = 0.13, Pos = -1.2, Life = 1.0},
+    ["Santa"]         = {Delay = 0.13, Pos = -1.2, Life = 0.8},
+    ["ServerBooster"] = {Delay = 0.13, Pos = -1.2, Life = 0.8},
+    ["Water"]         = {Delay = 0.13, Pos = -1.2, Life = 1.0},
+    ["XMAS2025"]      = {Delay = 0.13, Pos = -1.2, Life = 1.0},
+}
+
+-- [[ LÓGICA DE SPAWN ]] --
+local function spawnVFX(cf)
+    if getgenv().SelectedVFX == "None" then return end
+    local config = EffectsConfig[getgenv().SelectedVFX]
+    local original = ReplicatedStorage:WaitForChild("Effects"):WaitForChild("Jump"):FindFirstChild(getgenv().SelectedVFX)
+    
+    if original then
+        local clone = original:Clone()
+        clone:SetAttribute("IsGeminiEffect", true)
+        for _, obj in pairs(clone:GetDescendants()) do if obj:IsA("LuaSourceContainer") then obj:Destroy() end end
+        
+        -- Aplica posição com o Offset agressivo
+        local finalCF = cf * CFrame.new(0, config.Pos, 0)
+        if clone:IsA("Model") then clone:PivotTo(finalCF) else clone.CFrame = finalCF end
+        
+        clone.Anchored, clone.CanCollide, clone.Parent = true, false, Workspace
+        
+        local sound = clone:FindFirstChild("SoundEffect")
+        if sound and sound:IsA("Sound") then
+            sound.Volume = getgenv().GlobalVolume
+            sound:Play()
+        end
+        
+        for _, p in pairs(clone:GetDescendants()) do
+            if p:IsA("ParticleEmitter") then p:Emit(p.Rate + 20) p.Enabled = true end
+        end
+        Debris:AddItem(clone, config.Life)
+    end
+end
+
+-- [[ JANELA PRINCIPAL ]] --
+local Window = Rayfield:CreateWindow({
+    Name = "Lunar Hub // PRO",
+    LoadingTitle = "Carregando...",
+    LoadingSubtitle = "Premium",
+    ConfigurationSaving = { Enabled = true, FolderName = "LunarHubData", FileName = "Config" },
+    Theme = "LunarPro", 
+    Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
+    KeySystem = false, 
+})
+
+local JumpTab = Window:CreateTab("JumpChanger", 4483362458)
+
+-- [[ UI ELEMENTS ]] --
+local options = {}
+for name in pairs(EffectsConfig) do table.insert(options, name) end
+table.sort(options)
+
+JumpTab:CreateDropdown({
+    Name = "Efeito de Pulo",
+    Options = options,
+    CurrentOption = "None",
+    Callback = function(v) getgenv().SelectedVFX = (type(v) == "table" and v[1] or v) end
+})
+
+JumpTab:CreateSlider({
+    Name = "Volume SFX",
+    Range = {0, 10},
+    Increment = 0.5,
+    CurrentValue = 0.5,
+    Callback = function(v) getgenv().GlobalVolume = v end
+})
+
+-- [[ CONEXÕES ]] --
+getgenv().VFX_Cleaner = Workspace.ChildAdded:Connect(function(child)
+    if EffectsConfig[child.Name] and not child:GetAttribute("IsGeminiEffect") then
+        task.wait() child:Destroy()
+    end
+end)
+
+local function connect(char)
+    local hum = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+    getgenv().VFX_JumpConn = hum.StateChanged:Connect(function(_, newState)
+        if newState == Enum.HumanoidStateType.Jumping and getgenv().SelectedVFX ~= "None" then
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {char, Workspace:FindFirstChild("Players")}
+            params.FilterType = Enum.RaycastFilterType.Exclude
+
+            local res = Workspace:Raycast(root.Position, Vector3.new(0, -20, 0), params)
+            local rotation = root.CFrame - root.CFrame.Position
+            local spawnCF = res and (CFrame.new(res.Position) * rotation) or (root.CFrame * CFrame.new(0, -3.8, 0))
+            
+            task.wait(EffectsConfig[getgenv().SelectedVFX].Delay)
+            spawnVFX(spawnCF)
+        end
+    end)
+end
+
+if player.Character then connect(player.Character) end
+getgenv().VFX_CharConn = player.CharacterAdded:Connect(connect)
+
+Rayfield:Notify({Title = "Sucesso", Content = "Lunar Hub carregado!", Duration = 3})
