@@ -1,4 +1,3 @@
--- ARQUIVO: theme.lua (No GitHub/Pastebin)
 return {
     TextColor = Color3.fromRGB(255, 255, 255), 
     Background = Color3.fromRGB(0, 0, 0),
@@ -42,3 +41,5 @@ return {
     Section = Color3.fromRGB(5, 5, 5),
     SectionText = Color3.fromRGB(160, 130, 240)
 }
+
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/Griiem/Lunar/refs/heads/main/Lunar%20Theme"))()
