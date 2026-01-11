@@ -1,0 +1,130 @@
+return function(Tab)
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Players = game:GetService("Players")
+    local Workspace = game:GetService("Workspace")
+    local Debris = game:GetService("Debris")
+    local player = Players.LocalPlayer
+
+    -- [[ 1. LIMPEZA DE AMBIENTE ]] --
+    if getgenv().VFX_JumpConn then getgenv().VFX_JumpConn:Disconnect() end
+    if getgenv().VFX_CharConn then getgenv().VFX_CharConn:Disconnect() end
+    if getgenv().VFX_Cleaner then getgenv().VFX_Cleaner:Disconnect() end
+
+    -- [[ 2. ESTADOS GLOBAIS ]] --
+    getgenv().SelectedVFX = "None"
+    getgenv().SelectedLandingVFX = "None"
+    getgenv().GlobalVolume = 0.5
+
+    -- [[ 3. CONFIGURAÇÕES DOS EFEITOS ]] --
+    local JumpConfig = {
+        ["None"]          = {Delay = 0, Pos = 0.05, Life = 0},
+        ["Atomic"]        = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+        ["Default"]       = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+        ["Earth"]         = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+        ["Fire"]          = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+        ["HighFlyer"]     = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+        ["Ice"]           = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+        ["Light"]         = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+        ["Lightning"]     = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+        ["NewYears"]      = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+        ["Nuclear"]       = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+        ["Purple"]        = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+        ["SUMMER2025"]    = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+        ["Santa"]         = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+        ["ServerBooster"] = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+        ["Water"]         = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+        ["XMAS2025"]      = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    }
+
+    local LandingList = {"None", "Atomic", "Default", "Earth", "Fire", "Ice", "Light", "Lightning", "NewYears", "Nuclear", "Purple", "Santa", "Water"}
+    table.sort(LandingList)
+
+    -- [[ 4. FUNÇÃO CORE DE SPAWN ]] --
+    local function spawnVFX(cf, type)
+        local folderPath = (type == "Jump") and "Jump" or "Landing"
+        local selected = (type == "Jump") and getgenv().SelectedVFX or getgenv().SelectedLandingVFX
+        if selected == "None" then return end
+        
+        local original = ReplicatedStorage:WaitForChild("Effects"):WaitForChild(folderPath):FindFirstChild(selected)
+        if original then
+            local clone = original:Clone()
+            clone:SetAttribute("IsGeminiEffect", true)
+            for _, obj in pairs(clone:GetDescendants()) do if obj:IsA("LuaSourceContainer") then obj:Destroy() end end
+            
+            if clone:IsA("Model") then clone:PivotTo(cf) else clone.CFrame = cf end
+            clone.Anchored, clone.CanCollide, clone.Parent = true, false, Workspace
+            
+            local sound = clone:FindFirstChild("SoundEffect")
+            if sound and sound:IsA("Sound") then sound.Volume = getgenv().GlobalVolume sound:Play() end
+            
+            for _, p in pairs(clone:GetDescendants()) do if p:IsA("ParticleEmitter") then p:Emit(p.Rate + 30) p.Enabled = true end end
+            Debris:AddItem(clone, 2.0)
+        end
+    end
+
+    -- [[ 5. INJEÇÃO DA INTERFACE (VFX ENGINE) ]] --
+    Tab:CreateSection("Jump Changer")
+    local jOptions = {} for n in pairs(JumpConfig) do table.insert(jOptions, n) end table.sort(jOptions)
+    Tab:CreateDropdown({
+        Name = "Efeito de Pulo",
+        Options = jOptions,
+        CurrentOption = "None",
+        Callback = function(v) getgenv().SelectedVFX = (type(v) == "table" and v[1] or v) end
+    })
+
+    Tab:CreateSection("Landing Changer")
+    Tab:CreateDropdown({
+        Name = "Efeito de Queda de bola",
+        Options = LandingList,
+        CurrentOption = "None",
+        Callback = function(v) getgenv().SelectedLandingVFX = (type(v) == "table" and v[1] or v) end
+    })
+
+    Tab:CreateSection("Global Settings")
+    Tab:CreateSlider({
+        Name = "Volume geral (sfx)",
+        Range = {0, 10},
+        Increment = 0.5,
+        CurrentValue = 0.5,
+        Callback = function(v) getgenv().GlobalVolume = v end
+    })
+
+    -- [ ESPAÇO PARA ADICIONAR SPIKE / CORTE ABAIXO ] --
+
+    -- [[ 6. SISTEMAS DE DETECÇÃO ]] --
+    getgenv().VFX_Cleaner = Workspace.ChildAdded:Connect(function(child)
+        local valid = {["Earth"]=true, ["Default"]=true, ["Landing"]=true, ["Atomic"]=true, ["Fire"]=true}
+        if valid[child.Name] and not child:GetAttribute("IsGeminiEffect") then
+            task.wait()
+            if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+            local effectPos = child:IsA("Model") and child:GetPivot().Position or child.Position
+            
+            -- Detecta se é a bola (longe do player)
+            if (effectPos - player.Character.HumanoidRootPart.Position).Magnitude > 12 then
+                if getgenv().SelectedLandingVFX ~= "None" then
+                    -- Spawn Horizontal e Realista (-0.45)
+                    spawnVFX(CFrame.new(effectPos) * CFrame.new(0, -0.45, 0), "Landing")
+                end
+            end
+            child:Destroy()
+        end
+    end)
+
+    local function connect(char)
+        local hum = char:WaitForChild("Humanoid")
+        local root = char:WaitForChild("HumanoidRootPart")
+        getgenv().VFX_JumpConn = hum.StateChanged:Connect(function(_, newState)
+            if newState == Enum.HumanoidStateType.Jumping and getgenv().SelectedVFX ~= "None" then
+                local res = Workspace:Raycast(root.Position, Vector3.new(0, -20, 0), RaycastParams.new())
+                if res then
+                    local surfaceCF = CFrame.new(res.Position + Vector3.new(0,0.05,0)) * (root.CFrame - root.CFrame.Position)
+                    task.wait(JumpConfig[getgenv().SelectedVFX].Delay)
+                    spawnVFX(surfaceCF, "Jump")
+                end
+            end
+        end)
+    end
+
+    if player.Character then connect(player.Character) end
+    getgenv().VFX_CharConn = player.CharacterAdded:Connect(connect)
+end
