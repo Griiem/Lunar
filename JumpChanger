@@ -15,7 +15,7 @@ return function(Tab)
         Volume = 0.5,
         Config = {
             ["None"]          = {Delay = 0, Pos = 0, Life = 0},
-            ["Atomic"]        = {Delay = 0.13, Pos = -0.30, Life = 0.8},
+            ["Atomic"]        = {Delay = 0.13, Pos = -0.5, Life = 0.8},
             ["Default"]       = {Delay = 0.13, Pos = -0.30, Life = 0.8},
             ["Earth"]         = {Delay = 0.13, Pos = -0.30, Life = 1.0},
             ["Fire"]          = {Delay = 0.13, Pos = -0.30, Life = 1.0},
