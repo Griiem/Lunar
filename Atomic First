@@ -1,0 +1,125 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local Debris = game:GetService("Debris")
+
+local player = Players.LocalPlayer
+
+-- CONFIGURAÇÕES --
+local assetPath = ReplicatedStorage:WaitForChild("Effects"):WaitForChild("Jump"):WaitForChild("Atomic")
+
+-- [[ ⚠️ AJUSTE DE MÉDICO AQUI ⚠️ ]] --
+-- Se ainda achar alto, aumente para -0.3 ou -0.4. Se sumir no chão, diminua para -0.1.
+local OFFSET_CIRURGICO = -0.25 
+
+-- Variável de controle
+local isEnabled = false
+
+-- Remove scripts internos
+local function sanitizeEffect(effectModel)
+    for _, child in pairs(effectModel:GetDescendants()) do
+        if child:IsA("Script") or child:IsA("LocalScript") then
+            child:Destroy() 
+        end
+    end
+end
+
+-- Função que cria o efeito
+local function spawnEffect(targetCFrame)
+    if not assetPath or not isEnabled then return end
+
+    local clone = assetPath:Clone()
+    sanitizeEffect(clone) 
+    
+    -- Aplica o CFrame calculado (já com o offset cirúrgico)
+    clone.CFrame = targetCFrame
+    clone.Anchored = true
+    clone.CanCollide = false
+    clone.Parent = Workspace
+    
+    -- Força a emissão
+    for _, desc in pairs(clone:GetDescendants()) do
+        if desc:IsA("ParticleEmitter") then
+            desc:Emit(desc.Rate + 20)
+            desc.Enabled = true
+        end
+    end
+
+    Debris:AddItem(clone, 3) 
+end
+
+-- Lógica de Detecção Inteligente
+local function connectCharacter(char)
+    local hum = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+    
+    -- Filtro do Raycast
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {char}
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    
+    hum.StateChanged:Connect(function(old, new)
+        if isEnabled and new == Enum.HumanoidStateType.Jumping then
+            
+            -- 1. Raycast para achar o chão
+            local rayOrigin = root.Position
+            local rayDirection = Vector3.new(0, -15, 0) 
+            local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+            
+            local finalCFrame
+            
+            if rayResult then
+                -- ACHOU O CHÃO: Pega a posição + Rotação + OFFSET DE MÉDICO
+                local currentRotation = root.CFrame - root.CFrame.Position
+                
+                -- Aqui aplicamos o ajuste pra descer o efeito aquele pouquinho
+                finalCFrame = CFrame.new(rayResult.Position) * currentRotation * CFrame.new(0, OFFSET_CIRURGICO, 0)
+            else
+                -- Fallback se pular no void
+                finalCFrame = root.CFrame * CFrame.new(0, -3.5, 0)
+            end
+            
+            -- 2. Delay de 0.13s
+            task.wait(0.13) 
+            
+            -- 3. Spawna
+            spawnEffect(finalCFrame)
+        end
+    end)
+end
+
+-- UI LIBRARY (Rayfield)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "🏐 Atomic Precision (-0.25)",
+   LoadingTitle = "Carregando...",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false,
+})
+
+local Tab = Window:CreateTab("Bypass Effects", 4483362458)
+
+Tab:CreateToggle({
+   Name = "Ativar (Precision Mode)",
+   CurrentValue = false,
+   Flag = "AtomicPrecision", 
+   Callback = function(Value)
+       isEnabled = Value
+       
+       if Value then
+           if player.Character then 
+               connectCharacter(player.Character) 
+           end
+           Rayfield:Notify({Title = "Ativado", Content = "Altura calibrada: -0.25", Duration = 3})
+       else
+           Rayfield:Notify({Title = "Desativado", Content = "Script pausado.", Duration = 3})
+       end
+   end,
+})
+
+player.CharacterAdded:Connect(function(newChar)
+    if isEnabled then
+        connectCharacter(newChar)
+    end
+end)
