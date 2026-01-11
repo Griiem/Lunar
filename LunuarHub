@@ -1,0 +1,197 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- [[ SETUP DO TEMA CUSTOM ]] --
+local ThemeTable = loadstring(game:HttpGet("https://raw.githubusercontent.com/Griiem/Lunar/refs/heads/main/Lunar%20Theme"))()
+Rayfield.Theme.LunarPro = ThemeTable
+
+-- [[ LIMPEZA DE AMBIENTE ]] --
+if getgenv().VFX_JumpConn then getgenv().VFX_JumpConn:Disconnect() end
+if getgenv().VFX_CharConn then getgenv().VFX_CharConn:Disconnect() end
+if getgenv().VFX_Cleaner then getgenv().VFX_Cleaner:Disconnect() end
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local Debris = game:GetService("Debris")
+local player = Players.LocalPlayer
+
+-- Estados Globais
+getgenv().SelectedVFX = "None"
+getgenv().SelectedLandingVFX = "None"
+getgenv().SelectedSpikeVFX = "None"
+getgenv().GlobalVolume = 0.5
+
+-- [[ CONFIGS JUMP ]] --
+local JumpConfig = {
+    ["None"]          = {Delay = 0, Pos = 0.05, Life = 0},
+    ["Atomic"]        = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Default"]       = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Earth"]         = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    ["Fire"]          = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    ["HighFlyer"]     = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    ["Ice"]           = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Light"]         = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Lightning"]     = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    ["NewYears"]      = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Nuclear"]       = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Purple"]        = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["SUMMER2025"]    = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    ["Santa"]         = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["ServerBooster"] = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Water"]         = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    ["XMAS2025"]      = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+}
+
+-- [[ LISTAS DE DROPDOWN ]] --
+local LandingList = {"None", "Atomic", "Default", "Earth", "Fire", "Ice", "Light", "Lightning", "NewYears", "Nuclear", "Purple", "Santa", "Water"}
+table.sort(LandingList)
+
+local SpikeList = {
+    "None", "Atomic", "Default", "Earth", "Fire", "Ice", "Juggernaut", 
+    "Light", "Lightning", "NewYears", "Nuclear", "Purple", "SUMMER2025", 
+    "Santa", "Water", "XMAS2025"
+}
+table.sort(SpikeList)
+
+-- [[ FUNÇÃO DE SPAWN ]] --
+local function spawnVFX(cf, type)
+    local folderPath = type -- "Jump", "Landing" ou "Spike"
+    local selected = "None"
+    
+    if type == "Jump" then selected = getgenv().SelectedVFX
+    elseif type == "Landing" then selected = getgenv().SelectedLandingVFX
+    elseif type == "Spike" then selected = getgenv().SelectedSpikeVFX end
+
+    if selected == "None" then return end
+    
+    local original = ReplicatedStorage:WaitForChild("Effects"):WaitForChild(folderPath):FindFirstChild(selected)
+    
+    if original then
+        local clone = original:Clone()
+        clone:SetAttribute("IsGeminiEffect", true)
+        for _, obj in pairs(clone:GetDescendants()) do if obj:IsA("LuaSourceContainer") then obj:Destroy() end end
+        
+        if clone:IsA("Model") then clone:PivotTo(cf) else clone.CFrame = cf end
+        clone.Anchored, clone.CanCollide, clone.Parent = true, false, Workspace
+        
+        local sound = clone:FindFirstChild("SoundEffect")
+        if sound and sound:IsA("Sound") then
+            sound.Volume = getgenv().GlobalVolume
+            sound:Play()
+        end
+        
+        for _, p in pairs(clone:GetDescendants()) do
+            if p:IsA("ParticleEmitter") then p:Emit(p.Rate + 30) p.Enabled = true end
+        end
+        Debris:AddItem(clone, 2.0)
+    end
+end
+
+-- [[ JANELA RAYFIELD ]] --
+local Window = Rayfield:CreateWindow({
+    Name = "Lunar Hub // PRO",
+    LoadingTitle = "Lunar VFX Engine",
+    LoadingSubtitle = "VFX Engine Master",
+    ConfigurationSaving = { Enabled = true, FolderName = "LunarHubData", FileName = "Config" },
+    Theme = "LunarPro", 
+    Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
+    KeySystem = false, 
+})
+
+local VFXTab = Window:CreateTab("VFX Engine", 4483362458)
+
+VFXTab:CreateSection("Jump Changer")
+local jumpOptions = {}
+for name in pairs(JumpConfig) do table.insert(jumpOptions, name) end
+table.sort(jumpOptions)
+
+VFXTab:CreateDropdown({
+    Name = "Efeito de Pulo",
+    Options = jumpOptions,
+    CurrentOption = "None",
+    Callback = function(v) getgenv().SelectedVFX = (type(v) == "table" and v[1] or v) end
+})
+
+VFXTab:CreateSection("Landing Changer")
+VFXTab:CreateDropdown({
+    Name = "Efeito de Queda da Bola",
+    Options = LandingList,
+    CurrentOption = "None",
+    Callback = function(v) getgenv().SelectedLandingVFX = (type(v) == "table" and v[1] or v) end
+})
+
+VFXTab:CreateSection("Spike Changer")
+VFXTab:CreateDropdown({
+    Name = "Efeito de Corte (Spike)",
+    Options = SpikeList,
+    CurrentOption = "None",
+    Callback = function(v) getgenv().SelectedSpikeVFX = (type(v) == "table" and v[1] or v) end
+})
+
+VFXTab:CreateSection("Settings")
+VFXTab:CreateSlider({
+    Name = "Volume Geral (SFX)",
+    Range = {0, 10},
+    Increment = 0.5,
+    CurrentValue = 0.5,
+    Callback = function(v) getgenv().GlobalVolume = v end
+})
+
+-- [[ LÓGICA DE INTERCEPTAÇÃO INTELIGENTE ]] --
+getgenv().VFX_Cleaner = Workspace.ChildAdded:Connect(function(child)
+    local valid = {["Earth"]=true, ["Default"]=true, ["Landing"]=true, ["Atomic"]=true, ["Fire"]=true, ["Spike"]=true, ["Juggernaut"]=true}
+    
+    if valid[child.Name] and not child:GetAttribute("IsGeminiEffect") then
+        local char = player.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        
+        local root = char.HumanoidRootPart
+        task.wait() 
+        local effectPos = child:IsA("Model") and child:GetPivot().Position or child.Position
+        local distance = (effectPos - root.Position).Magnitude
+        
+        if distance > 12 then
+            -- É LANDING
+            if getgenv().SelectedLandingVFX ~= "None" then
+                spawnVFX(CFrame.new(effectPos) * CFrame.new(0, -0.45, 0), "Landing")
+            end
+        elseif distance < 7 then
+            -- É PERTO DO PLAYER (CORTE OU PULO?)
+            local heightDiff = effectPos.Y - root.Position.Y
+            if heightDiff > 1.2 then
+                -- É CORTE (SPIKE)
+                if getgenv().SelectedSpikeVFX ~= "None" then
+                    local spikeCF = child:IsA("Model") and child:GetPivot() or child.CFrame
+                    spawnVFX(spikeCF, "Spike")
+                end
+            end
+        end
+        child:Destroy()
+    end
+end)
+
+-- [[ DETECÇÃO DE PULO ]] --
+local function connect(char)
+    local hum = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+    getgenv().VFX_JumpConn = hum.StateChanged:Connect(function(_, newState)
+        if newState == Enum.HumanoidStateType.Jumping and getgenv().SelectedVFX ~= "None" then
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {char, Workspace:FindFirstChild("Players")}
+            params.FilterType = Enum.RaycastFilterType.Exclude
+
+            local res = Workspace:Raycast(root.Position, Vector3.new(0, -20, 0), params)
+            if res then
+                local rotation = root.CFrame - root.CFrame.Position
+                local surfaceCF = CFrame.new(res.Position + Vector3.new(0,0.05,0)) * rotation
+                task.wait(JumpConfig[getgenv().SelectedVFX].Delay)
+                spawnVFX(surfaceCF, "Jump")
+            end
+        end
+    end)
+end
+
+if player.Character then connect(player.Character) end
+getgenv().VFX_CharConn = player.CharacterAdded:Connect(connect)
+
+Rayfield:Notify({Title = "VFX Engine Master", Content = "Jump, Landing e Spike sincronizados!", Duration = 3})
