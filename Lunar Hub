@@ -4,12 +4,11 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local ThemeTable = loadstring(game:HttpGet("https://raw.githubusercontent.com/Griiem/Lunar/refs/heads/main/Lunar%20Theme"))()
 Rayfield.Theme.LunarPro = ThemeTable
 
--- [[ LIMPEZA DE AMBIENTE (KILL SWITCH) ]] --
+-- [[ LIMPEZA DE AMBIENTE ]] --
 if getgenv().VFX_JumpConn then getgenv().VFX_JumpConn:Disconnect() end
 if getgenv().VFX_CharConn then getgenv().VFX_CharConn:Disconnect() end
 if getgenv().VFX_Cleaner then getgenv().VFX_Cleaner:Disconnect() end
 
--- [[ CONFIGURAÇÕES GLOBAIS ]] --
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -19,28 +18,30 @@ local player = Players.LocalPlayer
 getgenv().SelectedVFX = "None"
 getgenv().GlobalVolume = 0.5
 
+-- [[ CONFIGURAÇÕES GLOBAIS ]] --
+-- Pos = 0.05 é o segredo: ele fica 0.05 studs acima do chão pra não bugar a textura kkk
 local EffectsConfig = {
     ["None"]          = {Delay = 0, Pos = 0, Life = 0},
-    ["Atomic"]        = {Delay = 0.13, Pos = -1.2, Life = 0.8},
-    ["Default"]       = {Delay = 0.13, Pos = -1.2, Life = 0.8},
-    ["Earth"]         = {Delay = 0.13, Pos = -1.2, Life = 1.0},
-    ["Fire"]          = {Delay = 0.13, Pos = -1.2, Life = 1.0},
-    ["HighFlyer"]     = {Delay = 0.13, Pos = -1.2, Life = 1.0},
-    ["Ice"]           = {Delay = 0.13, Pos = -1.2, Life = 0.8},
-    ["Light"]         = {Delay = 0.13, Pos = -1.2, Life = 0.8},
-    ["Lightning"]     = {Delay = 0.13, Pos = -1.2, Life = 1.0},
-    ["NewYears"]      = {Delay = 0.13, Pos = -1.2, Life = 0.8},
-    ["Nuclear"]       = {Delay = 0.13, Pos = -1.2, Life = 0.8},
-    ["Purple"]        = {Delay = 0.13, Pos = -1.2, Life = 0.8},
-    ["SUMMER2025"]    = {Delay = 0.13, Pos = -1.2, Life = 1.0},
-    ["Santa"]         = {Delay = 0.13, Pos = -1.2, Life = 0.8},
-    ["ServerBooster"] = {Delay = 0.13, Pos = -1.2, Life = 0.8},
-    ["Water"]         = {Delay = 0.13, Pos = -1.2, Life = 1.0},
-    ["XMAS2025"]      = {Delay = 0.13, Pos = -1.2, Life = 1.0},
+    ["Atomic"]        = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Default"]       = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Earth"]         = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    ["Fire"]          = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    ["HighFlyer"]     = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    ["Ice"]           = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Light"]         = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Lightning"]     = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    ["NewYears"]      = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Nuclear"]       = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Purple"]        = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["SUMMER2025"]    = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    ["Santa"]         = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["ServerBooster"] = {Delay = 0.13, Pos = 0.05, Life = 0.8},
+    ["Water"]         = {Delay = 0.13, Pos = 0.05, Life = 1.0},
+    ["XMAS2025"]      = {Delay = 0.13, Pos = 0.05, Life = 1.0},
 }
 
 -- [[ LÓGICA DE SPAWN ]] --
-local function spawnVFX(cf)
+local function spawnVFX(surfaceCF)
     if getgenv().SelectedVFX == "None" then return end
     local config = EffectsConfig[getgenv().SelectedVFX]
     local original = ReplicatedStorage:WaitForChild("Effects"):WaitForChild("Jump"):FindFirstChild(getgenv().SelectedVFX)
@@ -50,11 +51,19 @@ local function spawnVFX(cf)
         clone:SetAttribute("IsGeminiEffect", true)
         for _, obj in pairs(clone:GetDescendants()) do if obj:IsA("LuaSourceContainer") then obj:Destroy() end end
         
-        -- Aplica posição com o Offset agressivo
-        local finalCF = cf * CFrame.new(0, config.Pos, 0)
-        if clone:IsA("Model") then clone:PivotTo(finalCF) else clone.CFrame = finalCF end
+        -- AJUSTE DE COLISÃO VISUAL --
+        -- O efeito agora usa a superfície do chão como base e sobe o mínimo necessário (Pos)
+        local spawnPosition = surfaceCF * CFrame.new(0, config.Pos, 0)
         
-        clone.Anchored, clone.CanCollide, clone.Parent = true, false, Workspace
+        if clone:IsA("Model") then
+            clone:PivotTo(spawnPosition)
+        else
+            clone.CFrame = spawnPosition
+        end
+        
+        clone.Anchored = true
+        clone.CanCollide = false -- VFX não deve ter colisão física pra não te empurrar kkk
+        clone.Parent = Workspace
         
         local sound = clone:FindFirstChild("SoundEffect")
         if sound and sound:IsA("Sound") then
@@ -102,33 +111,31 @@ JumpTab:CreateSlider({
     Callback = function(v) getgenv().GlobalVolume = v end
 })
 
--- [[ CONEXÕES ]] --
-getgenv().VFX_Cleaner = Workspace.ChildAdded:Connect(function(child)
-    if EffectsConfig[child.Name] and not child:GetAttribute("IsGeminiEffect") then
-        task.wait() child:Destroy()
-    end
-end)
-
+-- [[ DETECÇÃO DE PULO ]] --
 local function connect(char)
     local hum = char:WaitForChild("Humanoid")
     local root = char:WaitForChild("HumanoidRootPart")
+    
     getgenv().VFX_JumpConn = hum.StateChanged:Connect(function(_, newState)
         if newState == Enum.HumanoidStateType.Jumping and getgenv().SelectedVFX ~= "None" then
+            -- RAYCAST PRECISO: Ignora players e foca no chão do mapa
             local params = RaycastParams.new()
             params.FilterDescendantsInstances = {char, Workspace:FindFirstChild("Players")}
             params.FilterType = Enum.RaycastFilterType.Exclude
 
             local res = Workspace:Raycast(root.Position, Vector3.new(0, -20, 0), params)
-            local rotation = root.CFrame - root.CFrame.Position
-            local spawnCF = res and (CFrame.new(res.Position) * rotation) or (root.CFrame * CFrame.new(0, -3.8, 0))
             
-            task.wait(EffectsConfig[getgenv().SelectedVFX].Delay)
-            spawnVFX(spawnCF)
+            if res then
+                -- O segredo: Usa a rotação do player + a posição exata de impacto do raio
+                local rotation = root.CFrame - root.CFrame.Position
+                local surfaceCF = CFrame.new(res.Position) * rotation
+                
+                task.wait(EffectsConfig[getgenv().SelectedVFX].Delay)
+                spawnVFX(surfaceCF)
+            end
         end
     end)
 end
 
+-- Iniciar
 if player.Character then connect(player.Character) end
-getgenv().VFX_CharConn = player.CharacterAdded:Connect(connect)
-
-Rayfield:Notify({Title = "Sucesso", Content = "Lunar Hub carregado!", Duration = 3})
