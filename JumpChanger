@@ -14,23 +14,24 @@ return function(Tab)
         Selected = "None",
         Volume = 0.5,
         Config = {
+            -- Aumentei o 'Pos' negativo para descer o efeito (Precision Mode)
             ["None"]          = {Delay = 0, Pos = 0, Life = 0},
-            ["Atomic"]        = {Delay = 0.13, Pos = -0.5, Life = 0.8},
-            ["Default"]       = {Delay = 0.13, Pos = -0.30, Life = 0.8},
-            ["Earth"]         = {Delay = 0.13, Pos = -0.30, Life = 1.0},
-            ["Fire"]          = {Delay = 0.13, Pos = -0.30, Life = 1.0},
-            ["HighFlyer"]     = {Delay = 0.13, Pos = -0.30, Life = 1.0},
-            ["Ice"]           = {Delay = 0.13, Pos = -0.30, Life = 0.8},
-            ["Light"]         = {Delay = 0.13, Pos = -0.30, Life = 0.8},
-            ["Lightning"]     = {Delay = 0.13, Pos = -0.30, Life = 1.0},
-            ["NewYears"]      = {Delay = 0.13, Pos = -0.30, Life = 0.8},
-            ["Nuclear"]       = {Delay = 0.13, Pos = -0.30, Life = 0.8},
-            ["Purple"]        = {Delay = 0.13, Pos = -0.30, Life = 0.8},
-            ["SUMMER2025"]    = {Delay = 0.13, Pos = -0.30, Life = 1.0},
-            ["Santa"]         = {Delay = 0.13, Pos = -0.30, Life = 0.8},
-            ["ServerBooster"] = {Delay = 0.13, Pos = -0.30, Life = 0.8},
-            ["Water"]         = {Delay = 0.13, Pos = -0.30, Life = 1.0},
-            ["XMAS2025"]      = {Delay = 0.13, Pos = -0.30, Life = 1.0},
+            ["Atomic"]        = {Delay = 0.13, Pos = -1.20, Life = 0.8},
+            ["Default"]       = {Delay = 0.13, Pos = -1.20, Life = 0.8},
+            ["Earth"]         = {Delay = 0.13, Pos = -1.20, Life = 1.0},
+            ["Fire"]          = {Delay = 0.13, Pos = -1.20, Life = 1.0},
+            ["HighFlyer"]     = {Delay = 0.13, Pos = -1.20, Life = 1.0},
+            ["Ice"]           = {Delay = 0.13, Pos = -1.20, Life = 0.8},
+            ["Light"]         = {Delay = 0.13, Pos = -1.20, Life = 0.8},
+            ["Lightning"]     = {Delay = 0.13, Pos = -1.20, Life = 1.0},
+            ["NewYears"]      = {Delay = 0.13, Pos = -1.20, Life = 0.8},
+            ["Nuclear"]       = {Delay = 0.13, Pos = -1.20, Life = 0.8},
+            ["Purple"]        = {Delay = 0.13, Pos = -1.20, Life = 0.8},
+            ["SUMMER2025"]    = {Delay = 0.13, Pos = -1.20, Life = 1.0},
+            ["Santa"]         = {Delay = 0.13, Pos = -1.20, Life = 0.8},
+            ["ServerBooster"] = {Delay = 0.13, Pos = -1.20, Life = 0.8},
+            ["Water"]         = {Delay = 0.13, Pos = -1.20, Life = 1.0},
+            ["XMAS2025"]      = {Delay = 0.13, Pos = -1.20, Life = 1.0},
         }
     }
 
@@ -46,6 +47,7 @@ return function(Tab)
             clone:SetAttribute("IsGeminiEffect", true)
             for _, obj in pairs(clone:GetDescendants()) do if obj:IsA("LuaSourceContainer") then obj:Destroy() end end
             
+            -- Aplica a posição calculada com o Offset da tabela
             clone.CFrame = cf * CFrame.new(0, config.Pos, 0)
             clone.Anchored = true
             clone.CanCollide = false
@@ -73,7 +75,7 @@ return function(Tab)
         Name = "Efeito de Pulo",
         Options = options,
         CurrentOption = "None",
-        Callback = function(v) JumpChanger.Selected = v[1] or v end
+        Callback = function(v) JumpChanger.Selected = (type(v) == "table" and v[1] or v) end
     })
 
     Tab:CreateSlider({
@@ -98,10 +100,19 @@ return function(Tab)
         local root = char:WaitForChild("HumanoidRootPart")
         getgenv().VFX_JumpConn = hum.StateChanged:Connect(function(_, newState)
             if newState == Enum.HumanoidStateType.Jumping and JumpChanger.Selected ~= "None" then
-                local res = Workspace:Raycast(root.Position, Vector3.new(0, -15, 0))
-                local cf = res and (CFrame.new(res.Position) * (root.CFrame - root.CFrame.Position)) or (root.CFrame * CFrame.new(0,-3,0))
+                -- Raycast para garantir que o efeito spawna no chão
+                local params = RaycastParams.new()
+                params.FilterDescendantsInstances = {char}
+                params.FilterType = Enum.RaycastFilterType.Exclude
+
+                local res = Workspace:Raycast(root.Position, Vector3.new(0, -15, 0), params)
+                local rotation = root.CFrame - root.CFrame.Position
+                
+                -- Se o raycast falhar, ele usa a posição do pé como fallback
+                local spawnCF = res and (CFrame.new(res.Position) * rotation) or (root.CFrame * CFrame.new(0, -3.5, 0))
+                
                 task.wait(JumpChanger.Config[JumpChanger.Selected].Delay)
-                spawnVFX(cf)
+                spawnVFX(spawnCF)
             end
         end)
     end
