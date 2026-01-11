@@ -1,0 +1,15 @@
+local SFX = {}
+
+function SFX.Play(parentPart, volume)
+    if not parentPart then return end
+    
+    local sound = parentPart:FindFirstChild("SoundEffect")
+    if sound and sound:IsA("Sound") then
+        sound.Volume = volume or 1
+        sound.RollOffMaxDistance = 150 -- Distância máxima pro som 3D
+        sound:Play()
+    end
+end
+
+-- Se quiser adicionar funções extras de som no futuro (tipo Stop ou Fade), coloca aqui
+return SFX
