@@ -1,0 +1,87 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local Debris = game:GetService("Debris")
+
+local JumpChanger = {}
+
+JumpChanger.EffectsConfig = {
+    ["None"]          = {Delay = 0, Pos = 0, Life = 0},
+    ["Atomic"]        = {Delay = 0.13, Pos = -0.30, Life = 0.8},
+    ["Default"]       = {Delay = 0.13, Pos = -0.30, Life = 0.8},
+    ["Earth"]         = {Delay = 0.13, Pos = -0.30, Life = 1.0},
+    ["Fire"]          = {Delay = 0.13, Pos = -0.30, Life = 1.0},
+    ["HighFlyer"]     = {Delay = 0.13, Pos = -0.30, Life = 1.0},
+    ["Ice"]           = {Delay = 0.13, Pos = -0.30, Life = 0.8},
+    ["Light"]         = {Delay = 0.13, Pos = -0.30, Life = 0.8},
+    ["Lightning"]     = {Delay = 0.13, Pos = -0.30, Life = 1.0},
+    ["NewYears"]      = {Delay = 0.13, Pos = -0.30, Life = 0.8},
+    ["Nuclear"]       = {Delay = 0.13, Pos = -0.30, Life = 0.8},
+    ["Purple"]        = {Delay = 0.13, Pos = -0.30, Life = 0.8},
+    ["SUMMER2025"]    = {Delay = 0.13, Pos = -0.30, Life = 1.0},
+    ["Santa"]         = {Delay = 0.13, Pos = -0.30, Life = 0.8},
+    ["ServerBooster"] = {Delay = 0.13, Pos = -0.30, Life = 0.8},
+    ["Water"]         = {Delay = 0.13, Pos = -0.30, Life = 1.0},
+    ["XMAS2025"]      = {Delay = 0.13, Pos = -0.30, Life = 1.0},
+}
+
+local function spawnVFX(cf)
+    local effectName = getgenv().SelectedVFX
+    if effectName == "None" then return end
+    
+    local config = JumpChanger.EffectsConfig[effectName]
+    local folder = ReplicatedStorage:WaitForChild("Effects"):WaitForChild("Jump")
+    local original = folder:FindFirstChild(effectName)
+    
+    if original then
+        local clone = original:Clone()
+        clone:SetAttribute("IsGeminiEffect", true)
+        for _, obj in pairs(clone:GetDescendants()) do if obj:IsA("LuaSourceContainer") then obj:Destroy() end end
+        
+        clone.CFrame = cf * CFrame.new(0, config.Pos, 0)
+        clone.Anchored = true
+        clone.CanCollide = false
+        clone.Parent = Workspace
+        
+        local sound = clone:FindFirstChild("SoundEffect")
+        if sound and sound:IsA("Sound") then
+            sound.Volume = getgenv().GlobalVolume
+            sound:Play()
+        end
+        
+        for _, p in pairs(clone:GetDescendants()) do
+            if p:IsA("ParticleEmitter") then p:Emit(p.Rate + 20) p.Enabled = true end
+        end
+        Debris:AddItem(clone, config.Life)
+    end
+end
+
+function JumpChanger.Init()
+    local player = Players.LocalPlayer
+    
+    -- Cleaner
+    getgenv().VFX_Cleaner = Workspace.ChildAdded:Connect(function(child)
+        if JumpChanger.EffectsConfig[child.Name] and not child:GetAttribute("IsGeminiEffect") then
+            task.wait() child:Destroy()
+        end
+    end)
+
+    -- Detection
+    local function connect(char)
+        local hum = char:WaitForChild("Humanoid")
+        local root = char:WaitForChild("HumanoidRootPart")
+        getgenv().VFX_JumpConn = hum.StateChanged:Connect(function(_, newState)
+            if newState == Enum.HumanoidStateType.Jumping and getgenv().SelectedVFX ~= "None" then
+                local result = Workspace:Raycast(root.Position, Vector3.new(0, -15, 0))
+                local spawnCF = result and (CFrame.new(result.Position) * (root.CFrame - root.CFrame.Position)) or (root.CFrame * CFrame.new(0, -3, 0))
+                task.wait(JumpChanger.EffectsConfig[getgenv().SelectedVFX].Delay)
+                spawnVFX(spawnCF)
+            end
+        end)
+    end
+
+    if player.Character then connect(player.Character) end
+    getgenv().VFX_CharConn = player.CharacterAdded:Connect(connect)
+end
+
+return JumpChanger
