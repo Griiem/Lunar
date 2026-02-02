@@ -1,0 +1,47 @@
+local VFX_Engine = https://raw.githubusercontent.com/Griiem/Lunar/refs/heads/main/VFX_Engine
+local Character = https://raw.githubusercontent.com/Griiem/Lunar/refs/heads/main/Characther
+
+
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "LUNAR HUB",
+    SubTitle = "Ultimate Edition",
+    TabWidth = 180,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = false, 
+    Theme = "Amethyst",
+    MinimizeKey = Enum.KeyCode.RightShift
+})
+
+-- Criando as Tabs de acordo com o que você pediu
+local Tabs = {
+    VFX = Window:AddTab({ Title = "VFX Engine", Icon = "star" }),
+    Character = Window:AddTab({ Title = "Character", Icon = "skull" }),
+    Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
+}
+
+-- [[ CARREGANDO MÓDULOS ]] --
+
+-- Carrega Character (Tilt + Grav + Speed)
+local CharModule = loadstring(game:HttpGet(Character))()
+CharModule.RenderCharacter(Tabs, Fluent, SaveManager)
+
+-- Carrega VFX Engine
+local VFXModule = loadstring(game:HttpGet(VFX_Engine))()
+VFXModule.AtivarVFX(Window, Tabs) -- Lembre de ajustar o módulo de VFX para receber esses argumentos!
+
+-- [[ CONFIGURAÇÃO DE SAVE (MISC) ]] --
+SaveManager:SetLibrary(Fluent)
+SaveManager:SetFolder("LunarHub_Data")
+SaveManager:BuildConfigSection(Tabs.Misc)
+
+Tabs.Misc:AddButton({
+    Title = "Destruir UI",
+    Callback = function() Window:Destroy() end
+})
+
+SaveManager:LoadAutoloadConfig()
+
+Fluent:Notify({ Title = "Lunar Hub", Content = "Hub carregado com sucesso!", Duration = 5 })
