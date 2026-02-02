@@ -1,28 +1,43 @@
--- [[ LUNAR HUB: UNIVERSAL LOADER ]] --
-local PlaceId = game.PlaceId
+local Window = Fluent:CreateWindow({
+    Title = "Lunar Hub",
+    SubTitle = ".gg/LunarHub / By: Lunar Team",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = false, 
+    Theme = "Amethyst",
+    MinimizeKey = Enum.KeyCode.LeftControl,
 
--- Lista de IDs compatíveis (CVR Retro e CVR Normal)
+    -- Opções Avançadas da sua imagem:
+    UserInfo = true, -- Mostra sua foto e nome na sidebar
+    UserInfoTitle = game.Players.LocalPlayer.Name, -- Título (Seu nome)
+    UserInfoSubtitle = "Lunar User", -- Subtítulo
+    UserInfoTop = true, -- Painel do usuário no topo da barra
+    BackgroundTransparency = 0.1 -- Janela levemente transparente
+})
+
+local PlaceId = game.PlaceId
 local CVR_IDs = {
     [79010415692181] = true, -- CVR Retro
     [114786545831333] = true  -- CVR Normal
 }
 
--- Verificação de Jogo
 if CVR_IDs[PlaceId] then
-    -- Se estiver em um dos IDs acima, carrega o seu script completo
-    local success, err = pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Griiem/Lunar/refs/heads/main/CVR%3ARetro"))()
+    local scriptUrl = "https://raw.githubusercontent.com/Griiem/Lunar/refs/heads/main/CVR%3ARetro"
+    
+    local success, result = pcall(function()
+        return game:HttpGet(scriptUrl)
     end)
 
-    if success then
-        print("Lunar Hub: CVR Modulo carregado com sucesso!")
+    if success and result then
+        local execute, err = loadstring(result)
+        if execute then
+            execute() -- Executa o script que baixou
+        else
+            warn("Lunar Hub: Erro na sintaxe do script baixado: " .. tostring(err))
+        end
     else
-        warn("Lunar Hub: Erro ao carregar o modulo: " .. tostring(err))
+        warn("Lunar Hub: Nao foi possivel baixar o script do GitHub.")
     end
 else
-    -- Se o jogo não for compatível, ele avisa (opcional)
-    print("Lunar Hub: Jogo nao suportado por este script.")
-    
-    -- Se quiser que apareça uma notificação mesmo sem carregar o hub:
-    -- (Opcional: você pode carregar uma UI básica aqui dizendo que não é compatível)
+    print("Lunar Hub: Jogo nao suportado (PlaceID: " .. PlaceId .. ")")
 end
