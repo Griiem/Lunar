@@ -1,0 +1,357 @@
+ -- [[ LUNAR HUB V10 + VISUAL TUFF INTEGRATED ]] --
+-- UI Library: Fluent
+-- Combined by: Gemini
+
+--------------------------------------------------------------------------------
+-- 1. LIMPEZA DE CONEXÕES & SETUP
+--------------------------------------------------------------------------------
+-- Limpeza do Lunar Hub
+if getgenv().Lunar_JumpConn then getgenv().Lunar_JumpConn:Disconnect() end
+if getgenv().Lunar_Workspace then getgenv().Lunar_Workspace:Disconnect() end
+if getgenv().Lunar_Character then getgenv().Lunar_Character:Disconnect() end
+if getgenv().Lunar_CharAdded then getgenv().Lunar_CharAdded:Disconnect() end
+
+-- Limpeza de Variáveis Globais Antigas
+_G.ScriptRunning = true -- Mantém true para o script rodar
+_G.VisualActive = false 
+
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local Debris = game:GetService("Debris")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------------------------------------
+-- 2. LÓGICA DO LUNAR HUB (JUMP VFX)
+--------------------------------------------------------------------------------
+local configs = {
+    selectedEffect = "None",
+    delayTime = 0.15,
+    lifeTime = 1.2,      
+    yOffset = 0.3,       
+    cooldownTime = 2.0   
+}
+
+local isJumpCooldown = false
+
+local gameEffectNames = {
+    ["Atomic"]=true, ["Celestium"]=true, ["Cosmic"]=true, ["Crimson"]=true, 
+    ["Default"]=true, ["Divine"]=true, ["Earth"]=true, ["Fire"]=true, 
+    ["HighFlyer"]=true, ["Ice"]=true, ["Light"]=true, ["Lightning"]=true, 
+    ["NewYears"]=true, ["Nature_Jump"]=true, ["Nuclear"]=true, 
+    ["SUMMER2025"]=true, ["Purple"]=true, ["Santa"]=true, ["ServerBooster"]=true, 
+    ["Water"]=true, ["XMAS2025"]=true, 
+    ["Jump"]=true, ["Landing"]=true, ["Effect"]=true, ["Ring"]=true
+}
+
+local effectList = {
+    "None", "Atomic", "Celestium", "Cosmic", "Crimson", "Default", 
+    "Divine", "Earth", "Fire", "HighFlyer", "Ice", "Light", 
+    "Lightning", "NewYears", "Nature_Jump", "Nuclear", 
+    "SUMMER2025", "Purple", "Santa", "ServerBooster", "Water", "XMAS2025"
+}
+
+local sfxMap = {
+    ["Celestium"]     = ReplicatedStorage.Effects:FindFirstChild("SFX") and ReplicatedStorage.Effects.SFX:FindFirstChild("Celestium") and ReplicatedStorage.Effects.SFX.Celestium:FindFirstChild("Jump"),
+    ["XMAS2025"]      = ReplicatedStorage.Effects.Jump:FindFirstChild("XMAS2025") and ReplicatedStorage.Effects.Jump.XMAS2025:FindFirstChild("SoundEffect"),
+    ["Water"]         = ReplicatedStorage.Effects.Jump:FindFirstChild("Water") and ReplicatedStorage.Effects.Jump.Water:FindFirstChild("SoundEffect"),
+    ["SUMMER2025"]    = ReplicatedStorage.Effects.Jump:FindFirstChild("SUMMER2025") and ReplicatedStorage.Effects.Jump.SUMMER2025:FindFirstChild("SoundEffect"),
+    ["Lightning"]     = ReplicatedStorage.Effects.Jump:FindFirstChild("Lightning") and ReplicatedStorage.Effects.Jump.Lightning:FindFirstChild("SoundEffect"),
+    ["HighFlyer"]     = ReplicatedStorage.Effects.Jump:FindFirstChild("HighFlyer") and ReplicatedStorage.Effects.Jump.HighFlyer:FindFirstChild("SoundEffect"),
+    ["Fire"]          = ReplicatedStorage.Effects.Jump:FindFirstChild("Fire") and ReplicatedStorage.Effects.Jump.Fire:FindFirstChild("SoundEffect"),
+    ["Earth"]         = ReplicatedStorage.Effects.Jump:FindFirstChild("Earth") and ReplicatedStorage.Effects.Jump.Earth:FindFirstChild("SoundEffect")
+}
+
+-- Interceptador (Backpack Fix)
+local function Intercept(child)
+    if gameEffectNames[child.Name] and not child:GetAttribute("LunarVFX") then
+        task.delay(0, function() 
+            if child then child:Destroy() end 
+        end)
+    end
+end
+getgenv().Lunar_Workspace = Workspace.ChildAdded:Connect(Intercept)
+
+local function MonitorChar(char)
+    if getgenv().Lunar_Character then getgenv().Lunar_Character:Disconnect() end
+    getgenv().Lunar_Character = char.ChildAdded:Connect(Intercept)
+end
+
+-- Spawn do Efeito
+local function spawnEffectAtPosition(pos)
+    if configs.selectedEffect == "None" or not pos then return end
+
+    local success, effectTemplate = pcall(function()
+        return ReplicatedStorage.Effects.Jump[configs.selectedEffect]
+    end)
+
+    if not success or not effectTemplate then return end
+
+    local clone = effectTemplate:Clone()
+    clone:SetAttribute("LunarVFX", true)
+    clone.Parent = Workspace
+    
+    local finalPos = pos - Vector3.new(0, configs.yOffset, 0)
+
+    if clone:IsA("Model") then
+        clone:PivotTo(CFrame.new(finalPos))
+    elseif clone:IsA("BasePart") then
+        clone.CFrame = CFrame.new(finalPos)
+    end
+
+    for _, v in pairs(clone:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Anchored = true
+            v.CanCollide = false
+        end
+        if v:IsA("ParticleEmitter") then
+            v.Enabled = true
+            v.Emit(v, 20)
+        end
+    end
+
+    local soundTemplate = sfxMap[configs.selectedEffect]
+    if soundTemplate then
+        local soundClone = soundTemplate:Clone()
+        soundClone.Parent = clone
+        soundClone:Play()
+    end
+
+    Debris:AddItem(clone, configs.lifeTime)
+end
+
+local function getGroundPosition()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    
+    local lFoot = char:FindFirstChild("LeftFoot") or char:FindFirstChild("Left Leg")
+    local rFoot = char:FindFirstChild("RightFoot") or char:FindFirstChild("Right Leg")
+    local root = char:FindFirstChild("HumanoidRootPart")
+
+    if not root then return nil end
+    if not lFoot then lFoot = root end
+    if not rFoot then rFoot = root end
+    
+    local centerPos = (lFoot.Position + rFoot.Position) / 2
+    local rayOrigin = centerPos + Vector3.new(0, 2, 0) 
+    
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {char}
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    
+    local rayResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -15, 0), rayParams)
+    
+    return rayResult and rayResult.Position or (centerPos - Vector3.new(0, 2.5, 0))
+end
+
+-- Detector Físico
+local function SetupJumpDetection(char)
+    local humanoid = char:WaitForChild("Humanoid", 10)
+    if not humanoid then return end
+
+    if getgenv().Lunar_JumpConn then getgenv().Lunar_JumpConn:Disconnect() end
+
+    getgenv().Lunar_JumpConn = humanoid.StateChanged:Connect(function(oldState, newState)
+        if newState == Enum.HumanoidStateType.Jumping then
+            if isJumpCooldown then return end
+            if configs.selectedEffect == "None" then return end
+            
+            isJumpCooldown = true
+            task.delay(configs.cooldownTime, function() isJumpCooldown = false end)
+
+            local jumpOrigin = getGroundPosition()
+            
+            task.spawn(function()
+                task.wait(configs.delayTime) 
+                if jumpOrigin then spawnEffectAtPosition(jumpOrigin) end
+            end)
+        end
+    end)
+    MonitorChar(char)
+end
+
+if LocalPlayer.Character then SetupJumpDetection(LocalPlayer.Character) end
+getgenv().Lunar_CharAdded = LocalPlayer.CharacterAdded:Connect(SetupJumpDetection)
+
+
+--------------------------------------------------------------------------------
+-- 3. LÓGICA DO VISUAL CHANGER (TUFF V56)
+--------------------------------------------------------------------------------
+local FakeSpec = "Higgie"
+local currentPwr = 15.5
+local isPopActive = false
+local isPopCooldown = false
+
+-- Função de Limpeza Definitiva (Visual)
+local function ForceVisuals(v)
+    if not v:IsA("TextLabel") or (v.Parent and v.Parent.Name == "TuffFinalHUD") then return end
+    
+    local function UpdateText()
+        if not _G.ScriptRunning then return end
+        local txt = v.Text:upper()
+        
+        -- Limpa Physical e Technical
+        if txt == "HEAVY HITTER" or txt == "WIPER" or v.Name:find("Physical") or v.Name:find("Technical") then
+            v.Text = ""
+        end
+        
+        -- Troca NONE
+        if _G.VisualActive and (txt == "NONE" or txt == "NENHUM") then
+            v.Text = FakeSpec
+        end
+    end
+
+    v:GetPropertyChangedSignal("Text"):Connect(UpdateText)
+    UpdateText()
+    
+    -- Esconde Spike PWR original
+    if v.Name:lower():find("pwr") or v.Text:find("/") then v.Visible = false end
+end
+
+game.Players.LocalPlayer.PlayerGui.DescendantAdded:Connect(ForceVisuals)
+for _, v in pairs(game.Players.LocalPlayer.PlayerGui:GetDescendants()) do ForceVisuals(v) end
+
+-- 2. HUD DE GAMEPLAY (STATUS E PWR)
+local pg = game.Players.LocalPlayer.PlayerGui
+if pg:FindFirstChild("TuffFinalHUD") then pg.TuffFinalHUD:Destroy() end
+local sg = Instance.new("ScreenGui", pg); sg.Name = "TuffFinalHUD"; sg.IgnoreGuiInset = true
+
+local status = Instance.new("TextLabel", sg)
+status.Size = UDim2.new(0, 400, 0, 30); status.Position = UDim2.new(0.5, -200, 0.865, 0) 
+status.BackgroundTransparency = 1; status.TextColor3 = Color3.fromRGB(0, 255, 0)
+status.Font = Enum.Font.GothamBold; status.TextSize = 21; status.TextStrokeTransparency = 0.4
+status.Text = "SPEC STATUS: READY"
+
+local pwrLabel = Instance.new("TextLabel", sg)
+pwrLabel.Size = UDim2.new(0, 200, 0, 30); pwrLabel.Position = UDim2.new(0.5, 23, 0.911, 0) 
+pwrLabel.BackgroundTransparency = 1; pwrLabel.TextColor3 = Color3.new(1, 1, 1)
+pwrLabel.Font = Enum.Font.GothamBold; pwrLabel.TextSize = 24; pwrLabel.TextXAlignment = Enum.TextXAlignment.Right
+pwrLabel.TextStrokeTransparency = 0.4
+
+local function updateDisplay()
+    pwrLabel.Text = isPopActive and "16.3/16.3" or string.format("%.1f/%.1f", currentPwr, currentPwr)
+end
+updateDisplay()
+
+-- LÓGICA DO POP (N) E TECLAS (Z,X,C, E/T)
+UserInputService.InputBegan:Connect(function(key, proc)
+    if proc or not _G.ScriptRunning then return end
+    
+    if not isPopActive then
+        if key.KeyCode == Enum.KeyCode.E then currentPwr = math.min(currentPwr + 1, 15.5)
+        elseif key.KeyCode == Enum.KeyCode.T then currentPwr = math.max(currentPwr - 1, 0)
+        elseif key.KeyCode == Enum.KeyCode.Z then currentPwr = 2
+        elseif key.KeyCode == Enum.KeyCode.X then currentPwr = 6
+        elseif key.KeyCode == Enum.KeyCode.C then currentPwr = 15.5 end
+        updateDisplay()
+    end
+
+    -- POP COM CONTADOR AMARELO E COOLDOWN
+    if key.KeyCode == Enum.KeyCode.N and not isPopActive and not isPopCooldown then
+        isPopActive = true
+        updateDisplay()
+        status.TextColor3 = Color3.new(1, 1, 0) -- Amarelo
+        
+        task.spawn(function()
+            for i = 7, 0, -1 do
+                if not _G.ScriptRunning then break end
+                status.Text = "SPEC STATUS: USING ("..i.."s)"
+                task.wait(1)
+            end
+            
+            isPopActive = false
+            isPopCooldown = true
+            updateDisplay()
+            status.TextColor3 = Color3.new(1, 0, 0) -- Vermelho
+            
+            for i = 180, 1, -1 do
+                if not _G.ScriptRunning then break end
+                status.Text = "SPEC STATUS: COOLDOWN ("..i.."s)"
+                task.wait(1)
+            end
+            
+            if _G.ScriptRunning then
+                status.Text = "SPEC STATUS: READY"
+                status.TextColor3 = Color3.fromRGB(0, 255, 0) -- Verde
+                isPopCooldown = false
+            end
+        end)
+    end
+end)
+
+
+--------------------------------------------------------------------------------
+-- 4. UI FLUENT COMPLETA
+--------------------------------------------------------------------------------
+local Window = Fluent:CreateWindow({
+    Title = "Lunar Hub 🌙 + Visuals",
+    SubTitle = "Complete Edition",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = false,
+    Theme = "Amethyst",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main VFX", Icon = "sparkles" }),
+    Visuals = Window:AddTab({ Title = "Visual Spec", Icon = "eye" })
+}
+
+-- [[ ABA MAIN: EFEITOS DE PULO ]] --
+Tabs.Main:AddParagraph({Title = "Status", Content = "Use o Slider para ajustar a velocidade dos efeitos!"})
+
+local Dropdown = Tabs.Main:AddDropdown("Dropdown", {
+    Title = "Selecionar VFX",
+    Values = effectList,
+    Multi = false,
+    Default = 1,
+    Callback = function(Value)
+        configs.selectedEffect = Value
+    end
+})
+
+Tabs.Main:AddSlider("DelaySlider", {
+    Title = "Delay do Efeito (Segundos)",
+    Description = "0 = Instantâneo | 0.15 = Rápido | 0.4 = Lento",
+    Default = 0.15,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        configs.delayTime = Value
+    end
+})
+
+-- [[ ABA VISUALS: VISUAL CHANGER ]] --
+Tabs.Visuals:AddParagraph({Title = "Controles", Content = "Z/X/C/E/T alteram o PWR. 'N' ativa o POP."})
+
+Tabs.Visuals:AddInput("SpecNameInput", {
+    Title = "Nome da Spec (Troca NONE)",
+    Default = "Higgie",
+    Placeholder = "Digite o nome...",
+    Numeric = false,
+    Finished = true,
+    Callback = function(Value)
+        FakeSpec = Value
+    end
+})
+
+Tabs.Visuals:AddToggle("IllusionToggle", {
+    Title = "ATIVAR ILUSÃO TOTAL",
+    Default = false,
+    Callback = function(Value)
+        _G.VisualActive = Value
+    end
+})
+
+-- Seleciona a primeira aba
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "Lunar Hub Integrated",
+    Content = "Sistema carregado! VFX e Visual Changer prontos.",
+    Duration = 5
+})
