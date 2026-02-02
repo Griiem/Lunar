@@ -1,0 +1,17 @@
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+
+-- Função para o rejoin ultra rápido
+local function instaRejoin()
+    -- Se houver apenas você no servidor, ele apenas teleporta pro PlaceId
+    -- Se houver mais gente, ele tenta voltar pro exato mesmo servidor (JobId)
+    if #Players:GetPlayers() <= 1 then
+        TeleportService:Teleport(game.PlaceId, LP)
+    else
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LP)
+    end
+end
+
+-- Executa a função
+instaRejoin()
