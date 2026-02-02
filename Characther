@@ -1,0 +1,133 @@
+local Module = {}
+
+function Module.RenderCharacter(Tabs, Fluent, SaveManager)
+    local Options = Fluent.Options
+    local player = game.Players.LocalPlayer
+    local RunService = game:GetService("RunService")
+    local UIS = game:GetService("UserInputService")
+
+    -- [[ ESTADOS GLOBAIS ]] --
+    local Settings = {
+        GravAtivada = true, GravPulo = 40, GravQueda = 60,
+        WSAtivado = false, WSValor = 16,
+        JPAtivado = false, JPValor = 26,
+        TiltAngle = 2, TiltActive = false, IsDialogShowing = false,
+        OriginalTilt = { P = 0, D = 0, MaxTorque = Vector3.new(0,0,0), HasSaved = false }
+    }
+
+    -- Função Auxiliar para Tilt
+    local function RestoreOriginals(tiltObj)
+        if Settings.OriginalTilt.HasSaved and tiltObj then
+            tiltObj.MaxTorque = Settings.OriginalTilt.MaxTorque
+            tiltObj.P = Settings.OriginalTilt.P
+            tiltObj.D = Settings.OriginalTilt.D
+        end
+    end
+
+    -- [[ SEÇÃO: MOVIMENTAÇÃO ]] --
+    Tabs.Character:AddSection("Physics & Movement")
+
+    Tabs.Character:AddToggle("GravToggle", {Title = "Ativar Gravidade Dinâmica", Default = true})
+    Tabs.Character:AddSlider("PuloSlider", {Title = "Gravidade Subida", Default = 40, Min = 10, Max = 196, Rounding = 1, Callback = function(v) Settings.GravPulo = v end})
+    Tabs.Character:AddSlider("QuedaSlider", {Title = "Gravidade Queda", Default = 60, Min = 10, Max = 300, Rounding = 1, Callback = function(v) Settings.GravQueda = v end})
+
+    Tabs.Character:AddToggle("WSToggle", {Title = "Loop WalkSpeed", Default = false})
+    Tabs.Character:AddSlider("WSSlider", {Title = "Velocidade de Corrida", Default = 16, Min = 16, Max = 100, Rounding = 1, Callback = function(v) Settings.WSValor = v end})
+
+    Tabs.Character:AddToggle("JPToggle", {Title = "JumpPower Bypass", Default = false})
+    Tabs.Character:AddSlider("JPSlider", {Title = "Força do Pulo", Default = 26, Min = 0, Max = 150, Rounding = 1, Callback = function(v) Settings.JPValor = v end})
+
+    -- [[ SEÇÃO: TILT CHANGER ]] --
+    Tabs.Character:AddSection("Tilt Control")
+
+    Tabs.Character:AddToggle("TiltActive", {
+        Title = "Ativar Tilt Changer", Default = false,
+        Callback = function(Value) 
+            Settings.TiltActive = Value 
+            if not Value then
+                local char = player.Character
+                local tilt = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart:FindFirstChild("Tilt")
+                RestoreOriginals(tilt)
+            end
+        end
+    })
+
+    local TiltSlider = Tabs.Character:AddSlider("TiltAngle", {
+        Title = "Força do Tilt", Description = "1.0 a 10.0 (Rage > 4.5)",
+        Default = 2, Min = 1, Max = 10, Rounding = 1,
+        Callback = function(Value)
+            if Value > 4.5 and not Settings.IsDialogShowing then
+                Settings.IsDialogShowing = true
+                -- Chamar o diálogo através do objeto Window não é possível aqui sem passar a Window, 
+                -- então usamos uma notificação simples ou garantimos que a lógica funcione.
+                Settings.TiltAngle = Value
+                Settings.IsDialogShowing = false
+            else
+                Settings.TiltAngle = Value
+            end
+        end
+    })
+
+    -- [[ LOOP DE LÓGICA (CORE) ]] --
+    RunService.Heartbeat:Connect(function()
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hum or not hrp then return end
+
+        -- Lógica de WalkSpeed e JumpPower
+        if Options.WSToggle and Options.WSToggle.Value then hum.WalkSpeed = Settings.WSValor end
+        if Options.JPToggle and Options.JPToggle.Value then 
+            if hum.JumpPower ~= 0 then hum.JumpPower = Settings.JPValor end
+        end
+
+        -- Lógica de Gravidade
+        if Options.GravToggle and Options.GravToggle.Value then
+            local velY = hrp.AssemblyLinearVelocity.Y
+            if hum:GetState() == Enum.HumanoidStateType.Freefall or hum:GetState() == Enum.HumanoidStateType.Jumping then
+                workspace.Gravity = (velY > 0.1) and Settings.GravPulo or Settings.GravQueda
+            else
+                workspace.Gravity = 196.2
+            end
+        end
+
+        -- Lógica de Tilt
+        local tiltObj = hrp:FindFirstChild("Tilt")
+        if tiltObj then
+            if not Settings.OriginalTilt.HasSaved then
+                Settings.OriginalTilt.P = tiltObj.P
+                Settings.OriginalTilt.D = tiltObj.D
+                Settings.OriginalTilt.MaxTorque = tiltObj.MaxTorque
+                Settings.OriginalTilt.HasSaved = true
+            end
+
+            if Settings.TiltActive then
+                local state = hum:GetState()
+                if state == Enum.HumanoidStateType.Freefall or state == Enum.HumanoidStateType.Jumping then
+                    local radAngle = math.rad(Settings.TiltAngle * 25) 
+                    local rot = nil
+                    local pressing = false
+
+                    if UIS:IsKeyDown(Enum.KeyCode.W) then rot = CFrame.Angles(-radAngle, 0, 0); pressing = true
+                    elseif UIS:IsKeyDown(Enum.KeyCode.S) then rot = CFrame.Angles(radAngle, 0, 0); pressing = true
+                    elseif UIS:IsKeyDown(Enum.KeyCode.A) then rot = CFrame.Angles(0, 0, radAngle); pressing = true
+                    elseif UIS:IsKeyDown(Enum.KeyCode.D) then rot = CFrame.Angles(0, 0, -radAngle); pressing = true
+                    end
+
+                    if pressing then
+                        tiltObj.MaxTorque = Vector3.new(400000, 400000, 400000)
+                        tiltObj.D = 500; tiltObj.P = 10000
+                        local _, y, _ = hrp.CFrame:ToOrientation()
+                        tiltObj.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(0, y, 0) * rot
+                    else
+                        RestoreOriginals(tiltObj)
+                    end
+                else
+                    RestoreOriginals(tiltObj)
+                end
+            end
+        end
+    end)
+end
+
+return Module
