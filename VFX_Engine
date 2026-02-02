@@ -1,7 +1,7 @@
 local Module = {}
 
--- Passamos Window e Tabs como argumentos para o módulo saber onde criar as coisas
-function Module.AtivarVFX(Window, Tabs, Fluent, SaveManager)
+-- Recebe Window e Tabs do script principal para saber onde criar os componentes
+function Module.AtivarVFX(Window, Tabs)
     
     -- [[ LIMPEZA DE AMBIENTE ]] --
     if getgenv().VFX_JumpConn then getgenv().VFX_JumpConn:Disconnect() end
