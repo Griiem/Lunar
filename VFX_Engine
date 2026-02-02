@@ -1,178 +1,146 @@
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+local Module = {}
 
--- [[ LIMPEZA DE AMBIENTE ]] --
-if getgenv().VFX_JumpConn then getgenv().VFX_JumpConn:Disconnect() end
-if getgenv().VFX_CharConn then getgenv().VFX_CharConn:Disconnect() end
-if getgenv().VFX_Cleaner then getgenv().VFX_Cleaner:Disconnect() end
-
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local Debris = game:GetService("Debris")
-local player = Players.LocalPlayer
-
--- Estados Globais
-getgenv().SelectedVFX = "None"
-getgenv().SelectedSpikeVFX = "None"
-getgenv().GlobalVolume = 0.5
-
--- Travas de repetição
-local lastJumpTick = 0
-local lastSpikeTick = 0
-
--- [[ LISTAS REPAGINADAS ]] --
-local SpikeList = {
-    "None", "Atomic", "Default", "Fire", "GroupReward", "Ice", "Juggernaut", 
-    "Light", "Lightning", "Nature_Spike", "NewYears", "Purple", "Nuclear", 
-    "SUMMER2025", "Water", "XMAS2025", "Santa", "Celestium_spike", 
-    "Cosmic_Spike", "Crimson_Spike", "Divine_Spike", "Earth_Spike"
-}
-
-local JumpList = {
-    "None", "Atomic", "Default", "Divine", "Fire", "HighFlyer", "Ice", 
-    "Light", "Lightning", "Nature_Jump", "NewYears", "Nuclear", "Purple", 
-    "SUMMER2025", "Santa", "ServerBooster", "Water", "XMAS2025", 
-    "Celestium_jump", "Cosmic_Jump", "Crimson_Jump", "Earth_Jump"
-}
-
--- [[ FUNÇÃO DE SPAWN COM SFX CELESTIUM ]] --
-local function spawnVFX(cf, type)
-    local selected = (type == "Jump" and getgenv().SelectedVFX) or (type == "Spike" and getgenv().SelectedSpikeVFX)
-    if not selected or selected == "None" then return end
+-- Passamos Window e Tabs como argumentos para o módulo saber onde criar as coisas
+function Module.AtivarVFX(Window, Tabs, Fluent, SaveManager)
     
-    local original = ReplicatedStorage.Effects:FindFirstChild(type, true) and ReplicatedStorage.Effects[type]:FindFirstChild(selected) 
-    if not original then
-        original = ReplicatedStorage.Effects.NewEffects:FindFirstChild(selected)
-    end
+    -- [[ LIMPEZA DE AMBIENTE ]] --
+    if getgenv().VFX_JumpConn then getgenv().VFX_JumpConn:Disconnect() end
+    if getgenv().VFX_CharConn then getgenv().VFX_CharConn:Disconnect() end
+    if getgenv().VFX_Cleaner then getgenv().VFX_Cleaner:Disconnect() end
 
-    if original then
-        local clone = original:Clone()
-        clone:SetAttribute("IsGeminiEffect", true)
-        for _, obj in pairs(clone:GetDescendants()) do 
-            if obj:IsA("BasePart") then
-                obj.CanCollide, obj.CanTouch, obj.CanQuery = false, false, false
-                obj.Anchored = true
-            elseif obj:IsA("LuaSourceContainer") then 
-                obj:Destroy() 
-            end 
-        end
-        if clone:IsA("Model") then clone:PivotTo(cf) else clone.CFrame = cf end
-        clone.Parent = Workspace
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Players = game:GetService("Players")
+    local Workspace = game:GetService("Workspace")
+    local player = Players.LocalPlayer
+
+    -- Estados Globais
+    getgenv().SelectedVFX = "None"
+    getgenv().SelectedSpikeVFX = "None"
+    getgenv().GlobalVolume = 0.5
+
+    local lastJumpTick = 0
+    local lastSpikeTick = 0
+
+    local SpikeList = {
+        "None", "Atomic", "Default", "Fire", "GroupReward", "Ice", "Juggernaut", 
+        "Light", "Lightning", "Nature_Spike", "NewYears", "Purple", "Nuclear", 
+        "SUMMER2025", "Water", "XMAS2025", "Santa", "Celestium_spike", 
+        "Cosmic_Spike", "Crimson_Spike", "Divine_Spike", "Earth_Spike"
+    }
+
+    local JumpList = {
+        "None", "Atomic", "Default", "Divine", "Fire", "HighFlyer", "Ice", 
+        "Light", "Lightning", "Nature_Jump", "NewYears", "Nuclear", "Purple", 
+        "SUMMER2025", "Santa", "ServerBooster", "Water", "XMAS2025", 
+        "Celestium_jump", "Cosmic_Jump", "Crimson_Jump", "Earth_Jump"
+    }
+
+    local function spawnVFX(cf, type)
+        local selected = (type == "Jump" and getgenv().SelectedVFX) or (type == "Spike" and getgenv().SelectedSpikeVFX)
+        if not selected or selected == "None" then return end
         
-        -- Lógica de Som (Especial para Celestium)
-        local sound = clone:FindFirstChild("SoundEffect")
-        if selected == "Celestium_jump" then
-            sound = ReplicatedStorage.Effects.SFX.Celestium.Jump:Clone()
-            sound.Parent = clone
-        elseif selected == "Celestium_spike" then
-            sound = ReplicatedStorage.Effects.SFX.Celestium.Spike:Clone()
-            sound.Parent = clone
+        local original = ReplicatedStorage.Effects:FindFirstChild(type, true) and ReplicatedStorage.Effects[type]:FindFirstChild(selected) 
+        if not original then
+            original = ReplicatedStorage.Effects.NewEffects:FindFirstChild(selected)
         end
 
-        if sound and sound:IsA("Sound") then 
-            sound.Volume = getgenv().GlobalVolume 
-            sound:Play() 
-        end
+        if original then
+            local clone = original:Clone()
+            clone:SetAttribute("IsGeminiEffect", true)
+            for _, obj in pairs(clone:GetDescendants()) do 
+                if obj:IsA("BasePart") then
+                    obj.CanCollide, obj.CanTouch, obj.CanQuery = false, false, false
+                    obj.Anchored = true
+                elseif obj:IsA("LuaSourceContainer") then 
+                    obj:Destroy() 
+                end 
+            end
+            if clone:IsA("Model") then clone:PivotTo(cf) else clone.CFrame = cf end
+            clone.Parent = Workspace
+            
+            local sound = clone:FindFirstChild("SoundEffect")
+            if selected == "Celestium_jump" then
+                sound = ReplicatedStorage.Effects.SFX.Celestium.Jump:Clone()
+                sound.Parent = clone
+            elseif selected == "Celestium_spike" then
+                sound = ReplicatedStorage.Effects.SFX.Celestium.Spike:Clone()
+                sound.Parent = clone
+            end
 
-        for _, p in pairs(clone:GetDescendants()) do if p:IsA("ParticleEmitter") then p:Emit(p.Rate + 30) p.Enabled = true end end
-        task.delay((type == "Jump" and 1.6 or 1.1), function() if clone then clone:Destroy() end end)
+            if sound and sound:IsA("Sound") then 
+                sound.Volume = getgenv().GlobalVolume 
+                sound:Play() 
+            end
+
+            for _, p in pairs(clone:GetDescendants()) do if p:IsA("ParticleEmitter") then p:Emit(p.Rate + 30) p.Enabled = true end end
+            task.delay((type == "Jump" and 1.6 or 1.1), function() if clone then clone:Destroy() end end)
+        end
     end
-end
 
--- [[ JANELA FLUENT ]] --
-local Window = Fluent:CreateWindow({
-    Title = "Lunar Hub // PRO",
-    SubTitle = "by Gemini",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
-    Acrylic = false,
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.RightShift
-})
+    -- [[ ABA VFX ENGINE ]] --
+    Tabs.VFX:AddSection("Jump Changer")
+    Tabs.VFX:AddDropdown("JumpDropdown", {
+        Title = "Efeito de Pulo",
+        Values = JumpList,
+        Default = "None",
+        Callback = function(v) getgenv().SelectedVFX = v end
+    })
 
-local Tabs = {
-    VFX = Window:AddTab({ Title = "VFX Engine", Icon = "sparkles" }),
-    Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
-}
+    Tabs.VFX:AddSection("Spike Changer")
+    Tabs.VFX:AddDropdown("SpikeDropdown", {
+        Title = "Efeito de Corte (Spike)",
+        Values = SpikeList,
+        Default = "None",
+        Callback = function(v) getgenv().SelectedSpikeVFX = v end
+    })
 
-SaveManager:SetLibrary(Fluent)
-SaveManager:SetFolder("LunarHubConfigs")
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({})
+    Tabs.VFX:AddSection("SFX Settings")
+    Tabs.VFX:AddSlider("VolumeSlider", {
+        Title = "Volume Geral (SFX)",
+        Default = 0.5,
+        Min = 0, Max = 10, Rounding = 1,
+        Callback = function(v) getgenv().GlobalVolume = v end
+    })
 
--- [[ ABA VFX ENGINE ]] --
-Tabs.VFX:AddSection("Jump Changer")
-Tabs.VFX:AddDropdown("JumpDropdown", {
-    Title = "Efeito de Pulo",
-    Values = JumpList,
-    Default = "None",
-    Callback = function(v) getgenv().SelectedVFX = v end
-})
-
-Tabs.VFX:AddSection("Spike Changer")
-Tabs.VFX:AddDropdown("SpikeDropdown", {
-    Title = "Efeito de Corte (Spike)",
-    Values = SpikeList,
-    Default = "None",
-    Callback = function(v) getgenv().SelectedSpikeVFX = v end
-})
-
-Tabs.VFX:AddSection("SFX Settings")
-Tabs.VFX:AddSlider("VolumeSlider", {
-    Title = "Volume Geral (SFX)",
-    Default = 0.5,
-    Min = 0, Max = 10, Rounding = 1,
-    Callback = function(v) getgenv().GlobalVolume = v end
-})
-
--- [[ ABA MISC ]] --
-SaveManager:BuildConfigSection(Tabs.Misc)
-
--- [[ LÓGICA DE INTERCEPTAÇÃO ]] --
-getgenv().VFX_Cleaner = Workspace.ChildAdded:Connect(function(child)
-    local valid = {["Spike"]=true, ["Juggernaut"]=true, ["Landing"]=true, ["Default"]=true}
-    if valid[child.Name] and not child:GetAttribute("IsGeminiEffect") then
-        local char = player.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        task.wait() 
-        local effectPos = child:IsA("Model") and child:GetPivot().Position or child.Position
-        if (effectPos - char.HumanoidRootPart.Position).Magnitude < 7 then
-            if (effectPos.Y - char.HumanoidRootPart.Position.Y) > 1.2 then
-                if getgenv().SelectedSpikeVFX ~= "None" and (tick() - lastSpikeTick) > 0.6 then
-                    lastSpikeTick = tick()
-                    spawnVFX(child:IsA("Model") and child:GetPivot() or child.CFrame, "Spike")
+    -- [[ LÓGICA DE INTERCEPTAÇÃO ]] --
+    getgenv().VFX_Cleaner = Workspace.ChildAdded:Connect(function(child)
+        local valid = {["Spike"]=true, ["Juggernaut"]=true, ["Landing"]=true, ["Default"]=true}
+        if valid[child.Name] and not child:GetAttribute("IsGeminiEffect") then
+            local char = player.Character
+            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+            task.wait() 
+            local effectPos = child:IsA("Model") and child:GetPivot().Position or child.Position
+            if (effectPos - char.HumanoidRootPart.Position).Magnitude < 7 then
+                if (effectPos.Y - char.HumanoidRootPart.Position.Y) > 1.2 then
+                    if getgenv().SelectedSpikeVFX ~= "None" and (tick() - lastSpikeTick) > 0.6 then
+                        lastSpikeTick = tick()
+                        spawnVFX(child:IsA("Model") and child:GetPivot() or child.CFrame, "Spike")
+                    end
                 end
             end
-        end
-        child:Destroy()
-    end
-end)
-
--- [[ DETECÇÃO DE PULO NOS PÉS ]] --
-local function connect(char)
-    local hum = char:WaitForChild("Humanoid")
-    getgenv().VFX_JumpConn = hum.StateChanged:Connect(function(_, newState)
-        if newState == Enum.HumanoidStateType.Jumping and getgenv().SelectedVFX ~= "None" and (tick() - lastJumpTick) > 0.6 then
-            lastJumpTick = tick()
-            local rFoot = char:FindFirstChild("RightFoot")
-            local lFoot = char:FindFirstChild("LeftFoot")
-            if rFoot and lFoot then
-                local midPoint = (rFoot.Position + lFoot.Position) / 2
-                local surfaceCF = CFrame.new(midPoint + Vector3.new(0, -0.15, 0)) * (char.HumanoidRootPart.CFrame - char.HumanoidRootPart.CFrame.Position)
-                spawnVFX(surfaceCF, "Jump")
-            end
+            child:Destroy()
         end
     end)
+
+    -- [[ DETECÇÃO DE PULO NOS PÉS ]] --
+    local function connect(char)
+        local hum = char:WaitForChild("Humanoid")
+        getgenv().VFX_JumpConn = hum.StateChanged:Connect(function(_, newState)
+            if newState == Enum.HumanoidStateType.Jumping and getgenv().SelectedVFX ~= "None" and (tick() - lastJumpTick) > 0.6 then
+                lastJumpTick = tick()
+                local rFoot = char:FindFirstChild("RightFoot")
+                local lFoot = char:FindFirstChild("LeftFoot")
+                if rFoot and lFoot then
+                    local midPoint = (rFoot.Position + lFoot.Position) / 2
+                    local surfaceCF = CFrame.new(midPoint + Vector3.new(0, -0.15, 0)) * (char.HumanoidRootPart.CFrame - char.HumanoidRootPart.CFrame.Position)
+                    spawnVFX(surfaceCF, "Jump")
+                end
+            end
+        end)
+    end
+
+    if player.Character then connect(player.Character) end
+    getgenv().VFX_CharConn = player.CharacterAdded:Connect(connect)
 end
 
-if player.Character then connect(player.Character) end
-getgenv().VFX_CharConn = player.CharacterAdded:Connect(connect)
-
--- [[ CARREGAMENTO E AUTO-REFRESH ]] --
-SaveManager:LoadAutoloadConfig()
-task.spawn(function()
-    task.wait(0.5)
-    if SaveManager.RefreshConfigList then SaveManager:RefreshConfigList() end
-end)
+return Module
