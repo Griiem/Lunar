@@ -1,0 +1,209 @@
+-- 67
+
+--------------------------------------------------------------------------------
+-- 1. LIMPEZA DE CONEXÕES & SETUP GLOBAL
+--------------------------------------------------------------------------------
+if getgenv().Lunar_JumpConn then getgenv().Lunar_JumpConn:Disconnect() end
+if getgenv().Lunar_Workspace then getgenv().Lunar_Workspace:Disconnect() end
+if getgenv().Lunar_Character then getgenv().Lunar_Character:Disconnect() end
+if getgenv().Lunar_CharAdded then getgenv().Lunar_CharAdded:Disconnect() end
+if getgenv().VFX_Cleaner then getgenv().VFX_Cleaner:Disconnect() end
+
+_G.ScriptRunning = true 
+_G.VisualActive = false
+
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+
+-- [[ ESTADOS GLOBAIS ]] --
+getgenv().SelectedVFX = "None"
+getgenv().SelectedSpikeVFX = "None"
+getgenv().GlobalVolume = 0.5
+local lastJumpTick, lastSpikeTick = 0, 0
+local FakeSpec = "Higgie"
+local currentPwr = 15.5
+local isPopActive, isPopCooldown = false, false
+
+local Settings = {
+    GravAtivada = true, GravPulo = 40, GravQueda = 60,
+    WSAtivado = false, WSValor = 16,
+    JPAtivado = false, JPValor = 26,
+    TiltAngle = 2, TiltActive = false, IsDialogShowing = false,
+    OriginalTilt = { P = 0, D = 0, MaxTorque = Vector3.new(0,0,0), HasSaved = false }
+}
+
+local SpikeList = {"None", "Atomic", "Default", "Fire", "GroupReward", "Ice", "Juggernaut", "Light", "Lightning", "Nature_Spike", "NewYears", "Purple", "Nuclear", "SUMMER2025", "Water", "XMAS2025", "Santa", "Celestium_spike", "Cosmic_Spike", "Crimson_Spike", "Divine_Spike", "Earth_Spike"}
+local JumpList = {"None", "Atomic", "Default", "Divine", "Fire", "HighFlyer", "Ice", "Light", "Lightning", "Nature_Jump", "NewYears", "Nuclear", "Purple", "SUMMER2025", "Santa", "ServerBooster", "Water", "XMAS2025", "Celestium_jump", "Cosmic_Jump", "Crimson_Jump", "Earth_Jump"}
+
+--------------------------------------------------------------------------------
+-- 2. LÓGICA DO VISUAL CHANGER (HUD & TECLAS)
+--------------------------------------------------------------------------------
+local function ForceVisuals(v)
+    if not v:IsA("TextLabel") or (v.Parent and v.Parent.Name == "TuffFinalHUD") then return end
+    local function UpdateText()
+        if not _G.ScriptRunning then return end
+        local txt = v.Text:upper()
+        if txt == "HEAVY HITTER" or txt == "WIPER" or v.Name:find("Physical") or v.Name:find("Technical") then v.Text = "" end
+        if _G.VisualActive and (txt == "NONE" or txt == "NENHUM") then v.Text = FakeSpec end
+    end
+    v:GetPropertyChangedSignal("Text"):Connect(UpdateText)
+    UpdateText()
+    if v.Name:lower():find("pwr") or v.Text:find("/") then v.Visible = false end
+end
+
+player.PlayerGui.DescendantAdded:Connect(ForceVisuals)
+for _, v in pairs(player.PlayerGui:GetDescendants()) do ForceVisuals(v) end
+
+local pg = player.PlayerGui
+if pg:FindFirstChild("TuffFinalHUD") then pg.TuffFinalHUD:Destroy() end
+local sg = Instance.new("ScreenGui", pg); sg.Name = "TuffFinalHUD"; sg.IgnoreGuiInset = true
+
+local status = Instance.new("TextLabel", sg)
+status.Size = UDim2.new(0, 400, 0, 30); status.Position = UDim2.new(0.5, -200, 0.865, 0)
+status.BackgroundTransparency = 1; status.TextColor3 = Color3.fromRGB(0, 255, 0)
+status.Font = Enum.Font.GothamBold; status.TextSize = 21; status.Text = "SPEC STATUS: READY"
+
+local pwrLabel = Instance.new("TextLabel", sg)
+pwrLabel.Size = UDim2.new(0, 200, 0, 30); pwrLabel.Position = UDim2.new(0.5, 23, 0.911, 0)
+pwrLabel.BackgroundTransparency = 1; pwrLabel.TextColor3 = Color3.new(1, 1, 1)
+pwrLabel.Font = Enum.Font.GothamBold; pwrLabel.TextSize = 24; pwrLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+local function updateDisplay()
+    pwrLabel.Text = isPopActive and "16.3/16.3" or string.format("%.1f/%.1f", currentPwr, currentPwr)
+end
+updateDisplay()
+
+--------------------------------------------------------------------------------
+-- 3. JANELA E ABAS
+--------------------------------------------------------------------------------
+local Window = Fluent:CreateWindow({
+    Title = "Lunar Hub | Cvr",
+    SubTitle = ".gg/LunarHub / By: Lunar Team",
+    TabWidth = 160, Size = UDim2.fromOffset(580, 460),
+    Acrylic = false, Theme = "Amethyst", MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    VFX = Window:AddTab({ Title = "VFX Engine", Icon = "star" }),
+    Character = Window:AddTab({ Title = "Character", Icon = "skull" }),
+    Spec = Window:AddTab({ Title = "Spec", Icon = "inspect" }),
+    Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
+}
+
+-- ABA CHARACTER (Com Tilt Melhorado)
+Tabs.Character:AddToggle("TiltActive", {
+    Title = "Ativar Tilt Changer", Default = false,
+    Callback = function(v) 
+        Settings.TiltActive = v 
+        if not v then
+            local char = player.Character
+            local tilt = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart:FindFirstChild("Tilt")
+            if Settings.OriginalTilt.HasSaved and tilt then
+                tilt.MaxTorque, tilt.P, tilt.D = Settings.OriginalTilt.MaxTorque, Settings.OriginalTilt.P, Settings.OriginalTilt.D
+            end
+        end
+    end
+})
+
+local TiltSlider = Tabs.Character:AddSlider("TiltAngle", {
+    Title = "Força do Tilt", Default = 2, Min = 1, Max = 10, Rounding = 1,
+    Callback = function(v)
+        if v > 4.5 and not Settings.IsDialogShowing then
+            Settings.IsDialogShowing = true
+            Window:Dialog({
+                Title = "Rage Option Detected",
+                Content = "This is a Rage option, do you accept to activate it?",
+                Buttons = {
+                    { Title = "Yes", Callback = function() Settings.TiltAngle = v Settings.IsDialogShowing = false end },
+                    { Title = "No", Callback = function() Settings.TiltAngle = 4 TiltSlider:SetValue(4) Settings.IsDialogShowing = false end }
+                }
+            })
+        else Settings.TiltAngle = v end
+    end
+})
+
+-- ABA SPEC (Visual Changer)
+Tabs.Spec:AddInput("SpecNameInput", {
+    Title = "Nome da Spec (Troca NONE)", Default = "Higgie",
+    Callback = function(v) FakeSpec = v end
+})
+Tabs.Spec:AddToggle("IllusionToggle", {
+    Title = "ATIVAR ILUSÃO TOTAL", Default = false,
+    Callback = function(v) _G.VisualActive = v end
+})
+
+--------------------------------------------------------------------------------
+-- 4. LÓGICA CORE (PHYSICS, VFX SPAWN & INPUTS)
+--------------------------------------------------------------------------------
+local function spawnVFX(cf, type)
+    local selected = (type == "Jump" and getgenv().SelectedVFX) or (type == "Spike" and getgenv().SelectedSpikeVFX)
+    if not selected or selected == "None" then return end
+    local original = ReplicatedStorage.Effects:FindFirstChild(type, true) and ReplicatedStorage.Effects[type]:FindFirstChild(selected) or ReplicatedStorage.Effects.NewEffects:FindFirstChild(selected)
+    if original then
+        local clone = original:Clone(); clone:SetAttribute("IsGeminiEffect", true)
+        for _, obj in pairs(clone:GetDescendants()) do if obj:IsA("BasePart") then obj.Anchored = true end end
+        if clone:IsA("Model") then clone:PivotTo(cf) else clone.CFrame = cf end
+        clone.Parent = Workspace
+        local sound = clone:FindFirstChild("SoundEffect")
+        if sound then sound.Volume = getgenv().GlobalVolume sound:Play() end
+        task.delay(1.5, function() if clone then clone:Destroy() end end)
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    local char = player.Character; local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hum or not hrp then return end
+
+    if Settings.WSAtivado then hum.WalkSpeed = Settings.WSValor end
+    if Settings.JPAtivado and hum.JumpPower ~= 0 then hum.JumpPower = Settings.JPValor end
+
+    -- Gravidade
+    if Settings.GravAtivada then
+        local velY = hrp.AssemblyLinearVelocity.Y
+        if hum:GetState() == Enum.HumanoidStateType.Freefall or hum:GetState() == Enum.HumanoidStateType.Jumping then
+            workspace.Gravity = (velY > 0.1) and Settings.GravPulo or Settings.GravQueda
+        else workspace.Gravity = 196.2 end
+    end
+
+    -- Tilt Changer (Física Melhorada)
+    local tiltObj = hrp:FindFirstChild("Tilt")
+    if tiltObj then
+        if not Settings.OriginalTilt.HasSaved then
+            Settings.OriginalTilt.P, Settings.OriginalTilt.D, Settings.OriginalTilt.MaxTorque = tiltObj.P, tiltObj.D, tiltObj.MaxTorque
+            Settings.OriginalTilt.HasSaved = true
+        end
+        if Settings.TiltActive and (hum:GetState() == Enum.HumanoidStateType.Freefall or hum:GetState() == Enum.HumanoidStateType.Jumping) then
+            local radAngle = math.rad(Settings.TiltAngle * 25)
+            local rot = UIS:IsKeyDown("W") and CFrame.Angles(-radAngle,0,0) or UIS:IsKeyDown("S") and CFrame.Angles(radAngle,0,0) or UIS:IsKeyDown("A") and CFrame.Angles(0,0,radAngle) or UIS:IsKeyDown("D") and CFrame.Angles(0,0,-radAngle)
+            if rot then
+                tiltObj.MaxTorque = Vector3.new(4e5, 4e5, 4e5); tiltObj.D, tiltObj.P = 500, 10000
+                local _, y, _ = hrp.CFrame:ToOrientation()
+                tiltObj.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(0, y, 0) * rot
+            else tiltObj.MaxTorque = Settings.OriginalTilt.MaxTorque end
+        else tiltObj.MaxTorque = Settings.OriginalTilt.MaxTorque end
+    end
+end)
+
+UIS.InputBegan:Connect(function(key, proc)
+    if proc or not _G.ScriptRunning then return end
+    if key.KeyCode == Enum.KeyCode.N and not isPopActive and not isPopCooldown then
+        isPopActive = true; status.TextColor3 = Color3.new(1,1,0)
+        task.spawn(function()
+            for i=7,0,-1 do status.Text="SPEC STATUS: USING ("..i.."s)"; task.wait(1) end
+            isPopActive = false; isPopCooldown = true; status.TextColor3 = Color3.new(1,0,0)
+            for i=180,1,-1 do status.Text="SPEC STATUS: COOLDOWN ("..i.."s)"; task.wait(1) end
+            status.Text="SPEC STATUS: READY"; status.TextColor3 = Color3.new(0,1,0); isPopCooldown = false
+        end)
+    end
+end)
+
+Window:SelectTab(1)
+Fluent:Notify({Title = "Lunar Hub", Content = "Sistema Integrado Carregado!", Duration = 5})
