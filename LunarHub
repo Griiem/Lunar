@@ -1,0 +1,28 @@
+-- [[ LUNAR HUB: UNIVERSAL LOADER ]] --
+local PlaceId = game.PlaceId
+
+-- Lista de IDs compatíveis (CVR Retro e CVR Normal)
+local CVR_IDs = {
+    [79010415692181] = true, -- CVR Retro
+    [114786545831333] = true  -- CVR Normal
+}
+
+-- Verificação de Jogo
+if CVR_IDs[PlaceId] then
+    -- Se estiver em um dos IDs acima, carrega o seu script completo
+    local success, err = pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Griiem/Lunar/refs/heads/main/CVR%3ARetro"))()
+    end)
+
+    if success then
+        print("Lunar Hub: CVR Modulo carregado com sucesso!")
+    else
+        warn("Lunar Hub: Erro ao carregar o modulo: " .. tostring(err))
+    end
+else
+    -- Se o jogo não for compatível, ele avisa (opcional)
+    print("Lunar Hub: Jogo nao suportado por este script.")
+    
+    -- Se quiser que apareça uma notificação mesmo sem carregar o hub:
+    -- (Opcional: você pode carregar uma UI básica aqui dizendo que não é compatível)
+end
