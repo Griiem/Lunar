@@ -1,0 +1,93 @@
+local Module = {}
+
+-- Passamos os objetos da UI como argumentos para o módulo saber onde se criar
+function Module.AtivarMovimento(Window, Tabs)
+    
+    local player = game.Players.LocalPlayer
+    local Options = _G.FluentOptions -- Usamos uma global ou passamos via argumento se preferir
+
+    local Settings = {
+        GravAtivada = true,
+        GravPulo = 40,
+        GravQueda = 60,
+        WSAtivado = false,
+        WSValor = 16,
+        JPAtivado = false,
+        JPValor = 26 
+    }
+
+    -- [ ABA GRAVIDADE ]
+    Tabs.Gravity:AddSection("Física de Queda")
+    
+    local GravToggle = Tabs.Gravity:AddToggle("GravToggle", {Title = "Ativar Gravidade Dinâmica", Default = true})
+    GravToggle:OnChanged(function() Settings.GravAtivada = GravToggle.Value end)
+
+    Tabs.Gravity:AddSlider("PuloSlider", {
+        Title = "Gravidade Subida", 
+        Default = 40, Min = 10, Max = 196, Rounding = 1, 
+        Callback = function(Value) Settings.GravPulo = Value end
+    })
+
+    Tabs.Gravity:AddSlider("QuedaSlider", {
+        Title = "Gravidade Queda", 
+        Default = 60, Min = 10, Max = 300, Rounding = 1, 
+        Callback = function(Value) Settings.GravQueda = Value end
+    })
+
+    -- [ ABA VELOCIDADE ]
+    Tabs.Movement:AddSection("WalkSpeed Loop")
+
+    local WSToggle = Tabs.Movement:AddToggle("WSToggle", {Title = "Ativar Loop WalkSpeed", Default = false})
+    WSToggle:OnChanged(function() Settings.WSAtivado = WSToggle.Value end)
+
+    Tabs.Movement:AddSlider("WSSlider", {
+        Title = "WalkSpeed (Corrida)", 
+        Default = 16, Min = 16, Max = 100, Rounding = 1, 
+        Callback = function(Value) Settings.WSValor = Value end
+    })
+
+    -- [ ABA PULO ]
+    Tabs.Jump:AddSection("JumpPower Control")
+
+    local JPToggle = Tabs.Jump:AddToggle("JPToggle", {Title = "Ativar JumpPower Bypass", Default = false})
+    JPToggle:OnChanged(function() Settings.JPAtivado = JPToggle.Value end)
+
+    Tabs.Jump:AddSlider("JPSlider", {
+        Title = "Força do Pulo", 
+        Default = 26, Min = 0, Max = 150, Rounding = 1, 
+        Callback = function(Value) Settings.JPValor = Value end
+    })
+
+    -- [ LÓGICA CORE ]
+    local function ApplyPhysics(character)
+        local humanoid = character:WaitForChild("Humanoid")
+        
+        local connection
+        connection = game:GetService("RunService").Heartbeat:Connect(function()
+            if not humanoid.Parent then connection:Disconnect() return end
+
+            if Settings.WSAtivado then humanoid.WalkSpeed = Settings.WSValor end
+            
+            if Settings.JPAtivado then
+                if humanoid.JumpPower ~= 0 and humanoid.JumpPower ~= Settings.JPValor then
+                    humanoid.JumpPower = Settings.JPValor
+                end
+            end
+
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp and Settings.GravAtivada then
+                local velY = hrp.AssemblyLinearVelocity.Y
+                if humanoid:GetState() == Enum.HumanoidStateType.Freefall or humanoid:GetState() == Enum.HumanoidStateType.Jumping then
+                    workspace.Gravity = (velY > 0.1) and Settings.GravPulo or Settings.GravQueda
+                else
+                    workspace.Gravity = 196.2
+                end
+            end
+        end)
+    end
+
+    if player.Character then ApplyPhysics(player.Character) end
+    player.CharacterAdded:Connect(ApplyPhysics)
+end
+
+return Module
