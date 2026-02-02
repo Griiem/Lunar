@@ -2,16 +2,24 @@ local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
 local LP = Players.LocalPlayer
 
--- Função para o rejoin ultra rápido
 local function instaRejoin()
-    -- Se houver apenas você no servidor, ele apenas teleporta pro PlaceId
-    -- Se houver mais gente, ele tenta voltar pro exato mesmo servidor (JobId)
-    if #Players:GetPlayers() <= 1 then
-        TeleportService:Teleport(game.PlaceId, LP)
-    else
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LP)
+    local placeId = game.PlaceId
+    local jobId = game.JobId
+
+    -- Criamos as opções de teleporte para tentar voltar pro mesmo servidor
+    local options = Instance.new("TeleportOptions")
+    options.ServerInstanceId = jobId
+
+    -- Tentativa principal (Async)
+    local success, err = pcall(function()
+        TeleportService:TeleportAsync(placeId, {LP}, options)
+    end)
+
+    -- Se falhar (ex: servidor cheio ou restrito), ele força o join em um servidor novo
+    if not success then
+        warn("Erro no Teleport: " .. tostring(err))
+        TeleportService:Teleport(placeId, LP)
     end
 end
 
--- Executa a função
 instaRejoin()
