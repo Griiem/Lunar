@@ -1,3 +1,11 @@
+-- Garante que a biblioteca carregue antes de prosseguir
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+if not Fluent then 
+    warn("Falha ao carregar a biblioteca Fluent!") 
+    return 
+end
+
 local Window = Fluent:CreateWindow({
     Title = "Lunar Hub",
     SubTitle = ".gg/LunarHub / By: Lunar Team",
@@ -7,37 +15,24 @@ local Window = Fluent:CreateWindow({
     Theme = "Amethyst",
     MinimizeKey = Enum.KeyCode.LeftControl,
 
-    -- Opções Avançadas da sua imagem:
-    UserInfo = true, -- Mostra sua foto e nome na sidebar
-    UserInfoTitle = game.Players.LocalPlayer.Name, -- Título (Seu nome)
-    UserInfoSubtitle = "Lunar User", -- Subtítulo
-    UserInfoTop = true, -- Painel do usuário no topo da barra
-    BackgroundTransparency = 0.1 -- Janela levemente transparente
+    -- [[ ADVANCED OPTIONS DA SUA IMAGEM ]] --
+    UserInfo = true, -- Ativa o perfil na sidebar
+    UserInfoTitle = game.Players.LocalPlayer.Name, -- Seu nome no titulo
+    UserInfoSubtitle = "Lunar Developer", -- Seu cargo no subtitulo
+    UserInfoTop = true, -- Coloca o perfil no topo da sidebar
+    BackgroundTransparency = 0.1, -- Transparencia da janela
+    -- Image = "rbxassetid://ID_DA_SUA_LOGO", -- Opcional: Logo acima das abas
 })
 
-local PlaceId = game.PlaceId
-local CVR_IDs = {
-    [79010415692181] = true, -- CVR Retro
-    [114786545831333] = true  -- CVR Normal
+-- Criando as Tabs seguindo sua nova estrutura
+local Tabs = {
+    VFX = Window:AddTab({ Title = "VFX Engine", Icon = "star" }),
+    Character = Window:AddTab({ Title = "Character", Icon = "skull" }),
+    Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
 }
 
-if CVR_IDs[PlaceId] then
-    local scriptUrl = "https://raw.githubusercontent.com/Griiem/Lunar/refs/heads/main/CVR%3ARetro"
-    
-    local success, result = pcall(function()
-        return game:HttpGet(scriptUrl)
-    end)
+-- Aqui voce continua com as chamadas dos seus modulos (Character, VFX, etc.)
+-- Exemplo: loadstring(game:HttpGet("LINK_DO_MODULO"))().RenderCharacter(Tabs, Fluent)
 
-    if success and result then
-        local execute, err = loadstring(result)
-        if execute then
-            execute() -- Executa o script que baixou
-        else
-            warn("Lunar Hub: Erro na sintaxe do script baixado: " .. tostring(err))
-        end
-    else
-        warn("Lunar Hub: Nao foi possivel baixar o script do GitHub.")
-    end
-else
-    print("Lunar Hub: Jogo nao suportado (PlaceID: " .. PlaceId .. ")")
-end
+Window:SelectTab(1)
+Fluent:Notify({ Title = "Lunar Hub", Content = "Hub carregado sem erros!", Duration = 5 })
