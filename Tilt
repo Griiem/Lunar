@@ -1,0 +1,114 @@
+return {
+local Options = {
+    TiltAngle = 2,
+    TiltActive = false,
+    IsDialogShowing = false,
+    -- Tabela para guardar o backup do jogo original
+    Original = {
+        P = 0,
+        D = 0,
+        MaxTorque = Vector3.new(0,0,0),
+        HasSaved = false
+    }
+}
+
+local TiltSlider
+
+-- Função que devolve os valores de fábrica do jogo
+local function RestoreOriginals(tiltObj)
+    if Options.Original.HasSaved and tiltObj then
+        tiltObj.MaxTorque = Options.Original.MaxTorque
+        tiltObj.P = Options.Original.P
+        tiltObj.D = Options.Original.D
+    end
+end
+
+Tabs.Volei:AddToggle("TiltActive", {
+    Title = "Ativar Tilt Changer", 
+    Default = false,
+    Callback = function(Value) 
+        Options.TiltActive = Value 
+        if not Value then
+            local char = game.Players.LocalPlayer.Character
+            local tilt = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart:FindFirstChild("Tilt")
+            RestoreOriginals(tilt)
+        end
+    end
+})
+
+TiltSlider = Tabs.Volei:AddSlider("TiltAngle", {
+    Title = "Força do Tilt",
+    Description = "1.0 a 10.0 (Buffado)",
+    Default = 2, Min = 1, Max = 10, Rounding = 1,
+    Callback = function(Value)
+        local numValue = tonumber(Value)
+        if numValue > 4.5 and not Options.IsDialogShowing then
+            Options.IsDialogShowing = true
+            Window:Dialog({
+                Title = "Rage Option Detected",
+                Content = "This is a Rage option, do you accept to activate it?",
+                Buttons = {
+                    { Title = "Yes", Callback = function() Options.TiltAngle = numValue Options.IsDialogShowing = false end },
+                    { Title = "No", Callback = function() Options.TiltAngle = 4 TiltSlider:SetValue(4) Options.IsDialogShowing = false end }
+                }
+            })
+        else
+            Options.TiltAngle = numValue
+        end
+    end
+})
+
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local lp = game.Players.LocalPlayer
+
+RunService.RenderStepped:Connect(function()
+    local char = lp.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local tiltObj = hrp and hrp:FindFirstChild("Tilt")
+    
+    if not tiltObj then return end
+
+    -- Salva o padrão do jogo na primeira vez que o script roda
+    if not Options.Original.HasSaved then
+        Options.Original.P = tiltObj.P
+        Options.Original.D = tiltObj.D
+        Options.Original.MaxTorque = tiltObj.MaxTorque
+        Options.Original.HasSaved = true
+    end
+
+    -- Se o Toggle estiver OFF, não faz nada e garante que o original está aplicado
+    if not Options.TiltActive then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    local state = hum:GetState()
+    if state == Enum.HumanoidStateType.Freefall or state == Enum.HumanoidStateType.Jumping then
+        local radAngle = math.rad(Options.TiltAngle * 25) 
+        local rot = nil
+        local pressing = false
+
+        if UIS:IsKeyDown(Enum.KeyCode.W) then rot = CFrame.Angles(-radAngle, 0, 0); pressing = true
+        elseif UIS:IsKeyDown(Enum.KeyCode.S) then rot = CFrame.Angles(radAngle, 0, 0); pressing = true
+        elseif UIS:IsKeyDown(Enum.KeyCode.A) then rot = CFrame.Angles(0, 0, radAngle); pressing = true
+        elseif UIS:IsKeyDown(Enum.KeyCode.D) then rot = CFrame.Angles(0, 0, -radAngle); pressing = true
+        end
+
+        if pressing then
+            tiltObj.MaxTorque = Vector3.new(400000, 400000, 400000)
+            tiltObj.D = 500
+            tiltObj.P = 10000
+            
+            local _, y, _ = hrp.CFrame:ToOrientation()
+            tiltObj.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(0, y, 0) * rot
+        else
+            -- Se soltar a tecla, volta pro original do servidor
+            RestoreOriginals(tiltObj)
+        end
+    else
+        -- No chão, volta pro original do servidor
+        RestoreOriginals(tiltObj)
+    end
+end)
+}
